@@ -44,12 +44,34 @@ meta: number;
 created_at?: string;
 };
 
+type EventoAgenda = {
+id: string;
+titulo: string;
+data: string;
+horario: string | null;
+categoria: string | null;
+descricao: string | null;
+recorrencia: string | null;
+concluido: boolean | null;
+created_at?: string;
+};
+
+type Notificacao = {
+id: string;
+titulo: string;
+mensagem: string;
+tipo: string | null;
+lida: boolean | null;
+created_at?: string;
+};
+
 type Aba =
 | "visao-geral"
 | "aportes"
 | "planejamento"
 | "itens"
-| "enxoval";
+| "enxoval"
+| "agenda";
 
 /* ================================================= */
 /* TEMAS DO ENXOVAL */
@@ -93,6 +115,52 @@ const [
 planejamentos,
 setPlanejamentos,
 ] = useState<PlanejamentoMensal[]>([]);
+
+/* NOSSA AGENDA */
+
+const [eventosAgenda, setEventosAgenda] =
+useState<EventoAgenda[]>([]);
+
+const [notificacoes, setNotificacoes] =
+useState<Notificacao[]>([]);
+
+const [notificacoesAbertas, setNotificacoesAbertas] =
+useState(false);
+
+const [modalAgenda, setModalAgenda] =
+useState(false);
+
+const [eventoEditando, setEventoEditando] =
+useState<EventoAgenda | null>(null);
+
+const [tituloEvento, setTituloEvento] =
+useState("");
+
+const [dataEvento, setDataEvento] =
+useState(
+new Date().toISOString().split("T")[0]
+);
+
+const [horarioEvento, setHorarioEvento] =
+useState("");
+
+const [categoriaEvento, setCategoriaEvento] =
+useState("Fazer juntos");
+
+const [descricaoEvento, setDescricaoEvento] =
+useState("");
+
+const [recorrenciaEvento, setRecorrenciaEvento] =
+useState("nenhuma");
+
+const [salvandoEvento, setSalvandoEvento] =
+useState(false);
+
+const [mesAgenda, setMesAgenda] =
+useState(new Date().getMonth());
+
+const [anoAgenda, setAnoAgenda] =
+useState(new Date().getFullYear());
 
 /* NOVO APORTE */
 
@@ -361,6 +429,34 @@ return meses[mes - 1];
 }
 
 /* ================================================= */
+/* NOTIFICAÇÕES */
+/* ================================================= */
+
+async function registrarNotificacao(
+titulo: string,
+mensagem: string,
+tipo = "info"
+) {
+  const { data: novaNotificacao, error } = await supabase
+    .from("notificacoes")
+    .insert({
+      titulo,
+      mensagem,
+      tipo,
+      lida: false,
+    })
+    .select("*")
+    .single();
+
+  if (!error && novaNotificacao) {
+    setNotificacoes((atual) => [
+      novaNotificacao,
+      ...atual,
+    ].slice(0, 30));
+  }
+}
+
+/* ================================================= */
 /* BUSCAR DADOS */
 /* ================================================= */
 
@@ -375,6 +471,8 @@ try {
     respostaItens,
     respostaConfiguracao,
     respostaPlanejamento,
+    respostaAgenda,
+    respostaNotificacoes,
   ] = await Promise.all([
     supabase
       .from("aportes")
@@ -412,6 +510,25 @@ try {
       .order("mes", {
         ascending: false,
       }),
+
+    supabase
+      .from("agenda_eventos")
+      .select("*")
+      .order("data", {
+        ascending: true,
+      })
+      .order("horario", {
+        ascending: true,
+        nullsFirst: false,
+      }),
+
+    supabase
+      .from("notificacoes")
+      .select("*")
+      .order("created_at", {
+        ascending: false,
+      })
+      .limit(30),
   ]);
 
   if (respostaAportes.error) {
@@ -432,6 +549,16 @@ try {
 
   if (respostaPlanejamento.error) {
     throw respostaPlanejamento.error;
+  }
+
+  // As tabelas novas são opcionais durante a primeira publicação.
+  // Se ainda não existirem no Supabase, o restante do sistema continua funcionando.
+  if (!respostaAgenda.error) {
+    setEventosAgenda(respostaAgenda.data || []);
+  }
+
+  if (!respostaNotificacoes.error) {
+    setNotificacoes(respostaNotificacoes.data || []);
   }
 
   const listaAportes =
@@ -518,12 +645,20 @@ if (error) {
   return;
 }
 
+const valorNotificacaoAporte = Number(valor);
+
 setPessoaSelecionada("");
 setValor("");
 setObservacao("");
 
 setModalAporteAberto(false);
 setSalvandoAporte(false);
+
+await registrarNotificacao(
+  "Novo aporte registrado",
+  `Um novo aporte de ${formatarMoeda(valorNotificacaoAporte)} foi adicionado.`,
+  "financeiro"
+);
 
 await buscarDados();
 
@@ -595,9 +730,16 @@ if (error) {
   return;
 }
 
+const valorNotificacao = Number(valorEdicao);
 setAporteEditando(null);
 
 setSalvandoEdicaoAporte(false);
+
+await registrarNotificacao(
+  "Aporte atualizado",
+  `Um aporte foi atualizado para ${formatarMoeda(valorNotificacao)}.`,
+  "financeiro"
+);
 
 await buscarDados();
 
@@ -633,6 +775,12 @@ if (error) {
 setAporteParaExcluir(null);
 
 setExcluindoAporte(false);
+
+await registrarNotificacao(
+  "Aporte removido",
+  "Um aporte foi removido do planejamento financeiro.",
+  "financeiro"
+);
 
 await buscarDados();
 
@@ -721,6 +869,12 @@ setMeta(
 setModalMetaPrincipal(false);
 
 setSalvandoMetaPrincipal(false);
+
+await registrarNotificacao(
+  "Meta principal atualizada",
+  `A meta principal agora é ${formatarMoeda(Number(metaPrincipalEditando))}.`,
+  "meta"
+);
 
 await buscarDados();
 
@@ -860,6 +1014,12 @@ setModalPlanejamento(false);
 
 setSalvandoPlanejamento(false);
 
+await registrarNotificacao(
+  "Meta mensal atualizada",
+  `A meta de ${nomeDoMes(mesPlanejamento)} de ${anoPlanejamento} foi atualizada.`,
+  "meta"
+);
+
 await buscarDados();
 
 }
@@ -948,6 +1108,12 @@ setObservacaoItem("");
 setModalItem(false);
 
 setSalvandoItem(false);
+
+await registrarNotificacao(
+  "Novo item adicionado",
+  `${nomeItem.trim()} foi adicionado ao planejamento.`,
+  "casa"
+);
 
 await buscarDados();
 
@@ -1082,9 +1248,16 @@ if (error) {
   return;
 }
 
+const nomeNotificacaoItem = nomeItemEdicao.trim();
 setItemEditando(null);
 
 setSalvandoEdicaoItem(false);
+
+await registrarNotificacao(
+  "Item atualizado",
+  `${nomeNotificacaoItem} foi atualizado.`,
+  "casa"
+);
 
 await buscarDados();
 
@@ -1117,12 +1290,234 @@ if (error) {
   return;
 }
 
+const nomeExcluido = itemParaExcluir.nome;
 setItemParaExcluir(null);
 
 setExcluindoItem(false);
 
+await registrarNotificacao(
+  "Item removido",
+  `${nomeExcluido} foi removido do planejamento.`,
+  "casa"
+);
+
 await buscarDados();
 
+}
+
+/* ================================================= */
+/* NOSSA AGENDA */
+/* ================================================= */
+
+function dataLocalString(
+dataBase = new Date()
+) {
+  const ano = dataBase.getFullYear();
+  const mes = String(dataBase.getMonth() + 1).padStart(2, "0");
+  const dia = String(dataBase.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function abrirNovoEvento(dataSelecionada = dataLocalString()) {
+  setEventoEditando(null);
+  setTituloEvento("");
+  setDataEvento(dataSelecionada);
+  setHorarioEvento("");
+  setCategoriaEvento("Fazer juntos");
+  setDescricaoEvento("");
+  setRecorrenciaEvento("nenhuma");
+  setErro("");
+  setModalAgenda(true);
+}
+
+function abrirEdicaoEvento(evento: EventoAgenda) {
+  setEventoEditando(evento);
+  setTituloEvento(evento.titulo);
+  setDataEvento(evento.data);
+  setHorarioEvento(evento.horario || "");
+  setCategoriaEvento(evento.categoria || "Fazer juntos");
+  setDescricaoEvento(evento.descricao || "");
+  setRecorrenciaEvento(evento.recorrencia || "nenhuma");
+  setErro("");
+  setModalAgenda(true);
+}
+
+async function salvarEventoAgenda(evento: FormEvent) {
+  evento.preventDefault();
+  setErro("");
+
+  if (!tituloEvento.trim()) {
+    setErro("Digite o título da programação.");
+    return;
+  }
+
+  if (!dataEvento) {
+    setErro("Escolha uma data.");
+    return;
+  }
+
+  setSalvandoEvento(true);
+
+  const dados = {
+    titulo: tituloEvento.trim(),
+    data: dataEvento,
+    horario: horarioEvento || null,
+    categoria: categoriaEvento || "Outros",
+    descricao: descricaoEvento.trim() || null,
+    recorrencia: recorrenciaEvento || "nenhuma",
+    concluido: eventoEditando?.concluido || false,
+  };
+
+  const resposta = eventoEditando
+    ? await supabase
+        .from("agenda_eventos")
+        .update(dados)
+        .eq("id", eventoEditando.id)
+    : await supabase
+        .from("agenda_eventos")
+        .insert(dados);
+
+  if (resposta.error) {
+    setErro(resposta.error.message);
+    setSalvandoEvento(false);
+    return;
+  }
+
+  const tituloNotificacao = eventoEditando
+    ? "Programação atualizada"
+    : "Nova programação adicionada";
+
+  setModalAgenda(false);
+  setEventoEditando(null);
+  setSalvandoEvento(false);
+
+  await registrarNotificacao(
+    tituloNotificacao,
+    `${dados.titulo} — ${dados.data}${dados.horario ? ` às ${dados.horario}` : ""}.`,
+    "agenda"
+  );
+
+  await buscarDados();
+}
+
+async function alternarConcluidoEvento(evento: EventoAgenda) {
+  const novoStatus = !evento.concluido;
+
+  const { error } = await supabase
+    .from("agenda_eventos")
+    .update({ concluido: novoStatus })
+    .eq("id", evento.id);
+
+  if (error) {
+    setErro(error.message);
+    return;
+  }
+
+  await registrarNotificacao(
+    novoStatus ? "Programação concluída" : "Programação reaberta",
+    `${evento.titulo} foi ${novoStatus ? "marcada como concluída" : "marcada novamente como pendente"}.`,
+    "agenda"
+  );
+
+  await buscarDados();
+}
+
+async function excluirEventoAgenda(evento: EventoAgenda) {
+  const { error } = await supabase
+    .from("agenda_eventos")
+    .delete()
+    .eq("id", evento.id);
+
+  if (error) {
+    setErro(error.message);
+    return;
+  }
+
+  await registrarNotificacao(
+    "Programação removida",
+    `${evento.titulo} foi removida da nossa agenda.`,
+    "agenda"
+  );
+
+  await buscarDados();
+}
+
+function eventoAconteceNoDia(evento: EventoAgenda, dia: number) {
+  const dataOriginal = new Date(`${evento.data}T12:00:00`);
+  if (dataOriginal.getDate() !== dia) {
+    if (evento.recorrencia === "mensal") {
+      return true;
+    }
+    if (evento.recorrencia === "anual") {
+      return dataOriginal.getMonth() === mesAgenda;
+    }
+    return false;
+  }
+
+  if (evento.recorrencia === "anual") {
+    return dataOriginal.getMonth() === mesAgenda;
+  }
+
+  return true;
+}
+
+function formatarDataAgenda(dataString: string) {
+  return new Date(`${dataString}T12:00:00`).toLocaleDateString("pt-BR");
+}
+
+function eventosDoDia(dia: number) {
+  return eventosAgenda.filter((evento) => {
+    const dataOriginal = new Date(`${evento.data}T12:00:00`);
+
+    if (evento.recorrencia === "mensal") {
+      return dataOriginal.getDate() === dia;
+    }
+
+    if (evento.recorrencia === "anual") {
+      return dataOriginal.getDate() === dia && dataOriginal.getMonth() === mesAgenda;
+    }
+
+    return dataOriginal.getDate() === dia &&
+      dataOriginal.getMonth() === mesAgenda &&
+      dataOriginal.getFullYear() === anoAgenda;
+  });
+}
+
+function mudarMesAgenda(direcao: number) {
+  const novaData = new Date(anoAgenda, mesAgenda + direcao, 1);
+  setMesAgenda(novaData.getMonth());
+  setAnoAgenda(novaData.getFullYear());
+}
+
+async function marcarNotificacaoComoLida(id: string) {
+  const { error } = await supabase
+    .from("notificacoes")
+    .update({ lida: true })
+    .eq("id", id);
+
+  if (!error) {
+    setNotificacoes((atual) =>
+      atual.map((item) =>
+        item.id === id ? { ...item, lida: true } : item
+      )
+    );
+  }
+}
+
+async function marcarTodasNotificacoesComoLidas() {
+  const pendentes = notificacoes.filter((item) => !item.lida);
+  if (pendentes.length === 0) return;
+
+  const { error } = await supabase
+    .from("notificacoes")
+    .update({ lida: true })
+    .eq("lida", false);
+
+  if (!error) {
+    setNotificacoes((atual) =>
+      atual.map((item) => ({ ...item, lida: true }))
+    );
+  }
 }
 
 /* ================================================= */
@@ -1352,7 +1747,7 @@ return ( <main className="min-h-screen w-full overflow-x-hidden bg-slate-50 flex
 /* TELA */
 /* ================================================= */
 
-return ( <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidden bg-slate-50 text-slate-800"> <div className="flex min-h-screen w-full min-w-0">
+return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-800"> <div className="flex min-h-screen w-full">
 
     {/* MENU DESKTOP */}
 
@@ -1460,6 +1855,19 @@ return ( <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidd
           🧺 Enxoval
         </button>
 
+        <button
+          onClick={() =>
+            setAbaAtiva("agenda")
+          }
+          className={`w-full text-left px-4 py-3 rounded-xl transition font-medium ${
+            abaAtiva === "agenda"
+              ? "bg-pink-50 text-pink-600"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          ❤️ Nossa Agenda
+        </button>
+
       </nav>
 
       <div className="mt-auto pt-6">
@@ -1482,7 +1890,7 @@ return ( <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidd
 
     {/* CONTEÚDO */}
 
-    <div className="flex-1 min-w-0 w-full max-w-full md:ml-72">
+    <div className="flex-1 min-w-0 w-full md:ml-72">
 
       {/* MENU MOBILE */}
 
@@ -1508,7 +1916,7 @@ return ( <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidd
 
         </div>
 
-        <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto px-4 pb-4 overscroll-x-contain">
+        <div className="flex gap-2 overflow-x-auto px-4 pb-4">
 
           {[
             [
@@ -1530,6 +1938,10 @@ return ( <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidd
             [
               "enxoval",
               "🧺 Enxoval",
+            ],
+            [
+              "agenda",
+              "❤️ Agenda",
             ],
           ].map(
             ([id, nome]) => (
@@ -1557,7 +1969,74 @@ return ( <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidd
 
       {/* CONTEÚDO */}
 
-      <div className="w-full min-w-0 max-w-7xl mx-auto p-4 sm:p-5 md:p-10">
+      <div className="w-full min-w-0 p-4 sm:p-5 md:p-10 max-w-7xl mx-auto">
+
+        <div className="flex justify-end mb-4 relative">
+          <button
+            type="button"
+            onClick={() => setNotificacoesAbertas((aberta) => !aberta)}
+            className="relative w-11 h-11 rounded-xl bg-white border border-slate-200 shadow-sm hover:bg-slate-50 text-xl"
+            aria-label="Notificações"
+          >
+            🔔
+            {notificacoes.filter((item) => !item.lida).length > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-pink-500 text-white text-[11px] font-bold flex items-center justify-center">
+                {notificacoes.filter((item) => !item.lida).length > 9 ? "9+" : notificacoes.filter((item) => !item.lida).length}
+              </span>
+            )}
+          </button>
+
+          {notificacoesAbertas && (
+            <div className="absolute right-0 top-12 z-50 w-[min(92vw,380px)] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-slate-800">🔔 Novidades</h3>
+                  <p className="text-xs text-slate-500 mt-1">Atualizações do Plano Juntos</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={marcarTodasNotificacoesComoLidas}
+                  className="text-xs text-blue-600 font-semibold hover:underline"
+                >
+                  Marcar lidas
+                </button>
+              </div>
+
+              <div className="max-h-80 overflow-y-auto">
+                {notificacoes.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-slate-500">
+                    Nenhuma novidade por enquanto.
+                  </div>
+                ) : (
+                  notificacoes.map((item) => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      onClick={() => marcarNotificacaoComoLida(item.id)}
+                      className={`w-full text-left p-4 border-b border-slate-100 hover:bg-slate-50 ${item.lida ? "bg-white" : "bg-blue-50/40"}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-lg">
+                          {item.tipo === "agenda" ? "❤️" : item.tipo === "financeiro" ? "💰" : item.tipo === "casa" ? "🏠" : "🔔"}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-sm text-slate-800 break-words">{item.titulo}</p>
+                          <p className="text-xs text-slate-500 mt-1 break-words">{item.mensagem}</p>
+                          {item.created_at && (
+                            <p className="text-[11px] text-slate-400 mt-2">
+                              {new Date(item.created_at).toLocaleString("pt-BR")}
+                            </p>
+                          )}
+                        </div>
+                        {!item.lida && <span className="w-2 h-2 rounded-full bg-blue-500 mt-2 shrink-0" />}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {erro && (
           <div className="mb-6 break-words bg-red-50 border border-red-200 text-red-600 p-4 rounded-2xl">
@@ -2354,6 +2833,160 @@ return ( <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidd
           </>
         )}
 
+        {/* NOSSA AGENDA */}
+
+        {abaAtiva ===
+          "agenda" && (
+          <>
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-6 sm:mb-8">
+              <div className="min-w-0">
+                <p className="text-pink-500 font-semibold">
+                  Momentos, compromissos e datas especiais
+                </p>
+                <h2 className="text-3xl md:text-4xl font-bold mt-2 break-words">
+                  ❤️ Nossa Agenda
+                </h2>
+                <p className="text-slate-500 mt-2 max-w-2xl">
+                  Organizem o que vocês querem fazer juntos e as datas importantes que não podem esquecer.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => abrirNovoEvento()}
+                className="w-full sm:w-auto shrink-0 bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-2xl font-semibold shadow-sm"
+              >
+                + Adicionar programação
+              </button>
+            </div>
+
+            <section className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
+              <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-widest text-pink-500 font-bold">
+                    Calendário
+                  </p>
+                  <h3 className="text-2xl font-bold mt-1">
+                    {nomeDoMes(mesAgenda + 1)} {anoAgenda}
+                  </h3>
+                </div>
+
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => mudarMesAgenda(-1)} className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50">
+                    ←
+                  </button>
+                  <button type="button" onClick={() => { setMesAgenda(new Date().getMonth()); setAnoAgenda(new Date().getFullYear()); }} className="px-4 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-medium">
+                    Hoje
+                  </button>
+                  <button type="button" onClick={() => mudarMesAgenda(1)} className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50">
+                    →
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3 sm:p-5 overflow-x-auto">
+                <div className="min-w-[620px]">
+                  <div className="grid grid-cols-7 mb-2">
+                    {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((dia) => (
+                      <div key={dia} className="text-center text-xs sm:text-sm font-bold text-slate-400 py-2">
+                        {dia}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 border-l border-t border-slate-200 rounded-xl overflow-hidden">
+                    {Array.from({ length: new Date(anoAgenda, mesAgenda, 1).getDay() + new Date(anoAgenda, mesAgenda + 1, 0).getDate() }).map((_, indice) => {
+                      const primeiroDia = new Date(anoAgenda, mesAgenda, 1).getDay();
+                      const dia = indice - primeiroDia + 1;
+                      const valido = dia >= 1;
+                      const eventos = valido ? eventosDoDia(dia) : [];
+                      const hojeAgora = new Date();
+                      const ehHoje = valido &&
+                        hojeAgora.getDate() === dia &&
+                        hojeAgora.getMonth() === mesAgenda &&
+                        hojeAgora.getFullYear() === anoAgenda;
+
+                      return (
+                        <button
+                          type="button"
+                          key={indice}
+                          disabled={!valido}
+                          onClick={() => valido && abrirNovoEvento(`${anoAgenda}-${String(mesAgenda + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`)}
+                          className={`min-h-[92px] sm:min-h-[112px] text-left align-top p-2 border-r border-b border-slate-200 transition ${valido ? "bg-white hover:bg-pink-50/40" : "bg-slate-50"}`}
+                        >
+                          {valido && (
+                            <>
+                              <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${ehHoje ? "bg-pink-500 text-white" : "text-slate-600"}`}>
+                                {dia}
+                              </span>
+
+                              <div className="mt-1 space-y-1">
+                                {eventos.slice(0, 3).map((evento) => (
+                                  <span
+                                    key={evento.id}
+                                    onClick={(e) => { e.stopPropagation(); abrirEdicaoEvento(evento); }}
+                                    className={`block rounded-lg px-2 py-1 text-[11px] leading-tight font-medium truncate ${evento.concluido ? "bg-slate-100 text-slate-400 line-through" : evento.categoria === "Data importante" ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"}`}
+                                  >
+                                    {evento.horario ? `${evento.horario} ` : ""}{evento.titulo}
+                                  </span>
+                                ))}
+                                {eventos.length > 3 && (
+                                  <span className="text-[10px] text-slate-400 px-1">+{eventos.length - 3} mais</span>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="mt-5 sm:mt-6 bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm p-5 sm:p-6">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-xl font-bold">📌 Próximas programações</h3>
+                  <p className="text-sm text-slate-500 mt-1">O que vocês não querem esquecer.</p>
+                </div>
+                <span className="text-sm text-slate-400">{eventosAgenda.length} cadastrada(s)</span>
+              </div>
+
+              {eventosAgenda.length === 0 ? (
+                <div className="py-8 text-center">
+                  <div className="text-5xl">❤️</div>
+                  <p className="font-semibold mt-3">Ainda não há programações.</p>
+                  <p className="text-sm text-slate-500 mt-1">Adicionem um passeio, compromisso ou data especial.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {eventosAgenda.slice(0, 10).map((evento) => (
+                    <div key={evento.id} className="border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                      <button type="button" onClick={() => alternarConcluidoEvento(evento)} className={`w-11 h-11 rounded-xl shrink-0 ${evento.concluido ? "bg-green-50" : "bg-slate-50"}`}>
+                        {evento.concluido ? "✅" : "⭕"}
+                      </button>
+                      <button type="button" onClick={() => abrirEdicaoEvento(evento)} className="min-w-0 flex-1 text-left">
+                        <p className={`font-bold break-words ${evento.concluido ? "text-slate-400 line-through" : "text-slate-800"}`}>
+                          {evento.categoria === "Data importante" ? "❤️" : evento.categoria === "Compromisso" ? "📌" : evento.categoria === "Nossa casa" ? "🏠" : "💑"} {evento.titulo}
+                        </p>
+                        <p className="text-sm text-slate-500 mt-1">
+                          📅 {formatarDataAgenda(evento.data)}{evento.horario ? ` • ${evento.horario}` : ""}
+                          {evento.recorrencia && evento.recorrencia !== "nenhuma" ? ` • ${evento.recorrencia === "mensal" ? "todo mês" : "todo ano"}` : ""}
+                        </p>
+                        {evento.descricao && <p className="text-sm text-slate-500 mt-1 break-words">{evento.descricao}</p>}
+                      </button>
+                      <button type="button" onClick={() => excluirEventoAgenda(evento)} className="w-11 h-11 rounded-xl bg-red-50 text-red-500 shrink-0">
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
+
         {/* ENXOVAL */}
 
         {abaAtiva ===
@@ -2540,6 +3173,81 @@ return ( <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidd
     </div>
 
   </div>
+
+  {/* MODAL NOSSA AGENDA */}
+
+  {modalAgenda && (
+    <Modal>
+      <CabecalhoModal
+        titulo={eventoEditando ? "✏️ Editar programação" : "❤️ Nova programação"}
+        descricao="Registre algo que vocês querem viver, lembrar ou resolver juntos."
+        fechar={() => setModalAgenda(false)}
+      />
+
+      <form onSubmit={salvarEventoAgenda}>
+        <Campo
+          label="Título"
+          value={tituloEvento}
+          setValue={setTituloEvento}
+        />
+
+        <Campo
+          label="Data"
+          type="date"
+          value={dataEvento}
+          setValue={setDataEvento}
+        />
+
+        <Campo
+          label="Horário (opcional)"
+          type="time"
+          value={horarioEvento}
+          setValue={setHorarioEvento}
+        />
+
+        <div className="mb-4">
+          <label className="block font-medium mb-2 text-slate-700">Categoria</label>
+          <select
+            value={categoriaEvento}
+            onChange={(e) => setCategoriaEvento(e.target.value)}
+            className="w-full min-w-0 text-base border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-pink-300"
+          >
+            <option>Fazer juntos</option>
+            <option>Data importante</option>
+            <option>Compromisso</option>
+            <option>Nossa casa</option>
+            <option>Outros</option>
+          </select>
+        </div>
+
+        <div className="mb-4">
+          <label className="block font-medium mb-2 text-slate-700">Repetição</label>
+          <select
+            value={recorrenciaEvento}
+            onChange={(e) => setRecorrenciaEvento(e.target.value)}
+            className="w-full min-w-0 text-base border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-pink-300"
+          >
+            <option value="nenhuma">Não repetir</option>
+            <option value="mensal">Todo mês</option>
+            <option value="anual">Todo ano</option>
+          </select>
+        </div>
+
+        <textarea
+          value={descricaoEvento}
+          onChange={(e) => setDescricaoEvento(e.target.value)}
+          placeholder="Observação ou detalhes (opcional)"
+          className="w-full min-w-0 text-base border border-slate-200 rounded-xl p-3 mb-5 outline-none focus:ring-2 focus:ring-pink-300"
+          rows={4}
+        />
+
+        <BotaoSalvar
+          carregando={salvandoEvento}
+          texto={eventoEditando ? "Salvar alterações" : "Adicionar à agenda"}
+        />
+      </form>
+    </Modal>
+  )}
 
   {/* MODAL NOVO APORTE */}
 
@@ -3197,7 +3905,7 @@ return ( <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm ove
 
   <div className="min-h-full w-full flex items-end sm:items-center justify-center">
 
-    <div className="w-[calc(100%-1rem)] max-w-md max-h-[92vh] overflow-y-auto overflow-x-hidden bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 my-0 sm:my-8">
+    <div className="w-full max-w-md max-h-[92vh] overflow-y-auto bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 my-0 sm:my-8">
 
       {children}
 
