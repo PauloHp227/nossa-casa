@@ -44,27 +44,6 @@ meta: number;
 created_at?: string;
 };
 
-type EventoAgenda = {
-id: string;
-titulo: string;
-data: string;
-horario: string | null;
-categoria: string | null;
-descricao: string | null;
-recorrencia: string | null;
-concluido: boolean | null;
-created_at?: string;
-};
-
-type Notificacao = {
-id: string;
-titulo: string;
-mensagem: string;
-tipo: string | null;
-lida: boolean | null;
-created_at?: string;
-};
-
 type Aba =
 | "visao-geral"
 | "aportes"
@@ -72,6 +51,27 @@ type Aba =
 | "itens"
 | "enxoval"
 | "agenda";
+
+type AgendaEvento = {
+id: string;
+titulo: string;
+data: string;
+hora: string | null;
+categoria: string;
+descricao: string | null;
+recorrencia: string;
+concluido: boolean;
+created_at?: string;
+};
+
+type Notificacao = {
+id: string;
+titulo: string;
+mensagem: string;
+tipo: string;
+lida: boolean;
+created_at?: string;
+};
 
 /* ================================================= */
 /* TEMAS DO ENXOVAL */
@@ -118,49 +118,35 @@ setPlanejamentos,
 
 /* NOSSA AGENDA */
 
-const [eventosAgenda, setEventosAgenda] =
-useState<EventoAgenda[]>([]);
+const [agendaEventos, setAgendaEventos] =
+useState<AgendaEvento[]>([]);
 
 const [notificacoes, setNotificacoes] =
 useState<Notificacao[]>([]);
-
-const [notificacoesAbertas, setNotificacoesAbertas] =
-useState(false);
-
-const [modalAgenda, setModalAgenda] =
-useState(false);
-
-const [eventoEditando, setEventoEditando] =
-useState<EventoAgenda | null>(null);
-
-const [tituloEvento, setTituloEvento] =
-useState("");
-
-const [dataEvento, setDataEvento] =
-useState(
-new Date().toISOString().split("T")[0]
-);
-
-const [horarioEvento, setHorarioEvento] =
-useState("");
-
-const [categoriaEvento, setCategoriaEvento] =
-useState("Fazer juntos");
-
-const [descricaoEvento, setDescricaoEvento] =
-useState("");
-
-const [recorrenciaEvento, setRecorrenciaEvento] =
-useState("nenhuma");
-
-const [salvandoEvento, setSalvandoEvento] =
-useState(false);
 
 const [mesAgenda, setMesAgenda] =
 useState(new Date().getMonth());
 
 const [anoAgenda, setAnoAgenda] =
 useState(new Date().getFullYear());
+
+const [modalAgenda, setModalAgenda] =
+useState(false);
+
+const [eventoEditando, setEventoEditando] =
+useState<AgendaEvento | null>(null);
+
+const [tituloEvento, setTituloEvento] = useState("");
+const [dataEvento, setDataEvento] = useState("");
+const [horaEvento, setHoraEvento] = useState("");
+const [categoriaEvento, setCategoriaEvento] = useState("Fazer juntos");
+const [descricaoEvento, setDescricaoEvento] = useState("");
+const [recorrenciaEvento, setRecorrenciaEvento] = useState("nenhuma");
+const [salvandoEvento, setSalvandoEvento] = useState(false);
+const [eventoParaExcluir, setEventoParaExcluir] = useState<AgendaEvento | null>(null);
+const [excluindoEvento, setExcluindoEvento] = useState(false);
+const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
+const [notificacaoPermissao, setNotificacaoPermissao] = useState<NotificationPermission | "unsupported">("default");
 
 /* NOVO APORTE */
 
@@ -390,6 +376,34 @@ useEffect(() => {
 buscarDados();
 }, []);
 
+useEffect(() => {
+  if (typeof window !== "undefined" && "Notification" in window) {
+    setNotificacaoPermissao(Notification.permission);
+  }
+}, []);
+
+useEffect(() => {
+  if (!carregando && agendaEventos.length > 0) {
+    verificarLembretes();
+  }
+}, [carregando, agendaEventos]);
+
+useEffect(() => {
+  const agendaChannel = supabase
+    .channel("plano-juntos-agenda")
+    .on("postgres_changes", { event: "*", schema: "public", table: "agenda_eventos" }, () => {
+      buscarDados();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "notificacoes" }, () => {
+      buscarDados();
+    })
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(agendaChannel);
+  };
+}, []);
+
 /* ================================================= */
 /* FORMATAR MOEDA */
 /* ================================================= */
@@ -426,34 +440,6 @@ const meses = [
 
 return meses[mes - 1];
 
-}
-
-/* ================================================= */
-/* NOTIFICAÇÕES */
-/* ================================================= */
-
-async function registrarNotificacao(
-titulo: string,
-mensagem: string,
-tipo = "info"
-) {
-  const { data: novaNotificacao, error } = await supabase
-    .from("notificacoes")
-    .insert({
-      titulo,
-      mensagem,
-      tipo,
-      lida: false,
-    })
-    .select("*")
-    .single();
-
-  if (!error && novaNotificacao) {
-    setNotificacoes((atual) => [
-      novaNotificacao,
-      ...atual,
-    ].slice(0, 30));
-  }
 }
 
 /* ================================================= */
@@ -513,21 +499,14 @@ try {
 
     supabase
       .from("agenda_eventos")
-      .select("*")
-      .order("data", {
-        ascending: true,
-      })
-      .order("horario", {
-        ascending: true,
-        nullsFirst: false,
-      }),
+      .select("id, titulo, data, hora, categoria, descricao, recorrencia, concluido, created_at")
+      .order("data", { ascending: true })
+      .order("hora", { ascending: true }),
 
     supabase
       .from("notificacoes")
-      .select("*")
-      .order("created_at", {
-        ascending: false,
-      })
+      .select("id, titulo, mensagem, tipo, lida, created_at")
+      .order("created_at", { ascending: false })
       .limit(30),
   ]);
 
@@ -551,14 +530,12 @@ try {
     throw respostaPlanejamento.error;
   }
 
-  // As tabelas novas são opcionais durante a primeira publicação.
-  // Se ainda não existirem no Supabase, o restante do sistema continua funcionando.
   if (!respostaAgenda.error) {
-    setEventosAgenda(respostaAgenda.data || []);
+    setAgendaEventos((respostaAgenda.data || []) as AgendaEvento[]);
   }
 
   if (!respostaNotificacoes.error) {
-    setNotificacoes(respostaNotificacoes.data || []);
+    setNotificacoes((respostaNotificacoes.data || []) as Notificacao[]);
   }
 
   const listaAportes =
@@ -599,6 +576,205 @@ try {
   setCarregando(false);
 }
 
+}
+
+/* ================================================= */
+/* AGENDA E NOTIFICAÇÕES */
+/* ================================================= */
+
+function dataHojeLocal() {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = String(hoje.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoje.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+function abrirNovoEvento(dataInicial?: string) {
+  const dataPadrao = dataInicial || dataHojeLocal();
+  setEventoEditando(null);
+  setTituloEvento("");
+  setDataEvento(dataPadrao);
+  setHoraEvento("");
+  setCategoriaEvento("Fazer juntos");
+  setDescricaoEvento("");
+  setRecorrenciaEvento("nenhuma");
+  setErro("");
+  setModalAgenda(true);
+}
+
+function abrirEdicaoEvento(evento: AgendaEvento) {
+  setEventoEditando(evento);
+  setTituloEvento(evento.titulo);
+  setDataEvento(evento.data);
+  setHoraEvento(evento.hora || "");
+  setCategoriaEvento(evento.categoria || "Fazer juntos");
+  setDescricaoEvento(evento.descricao || "");
+  setRecorrenciaEvento(evento.recorrencia || "nenhuma");
+  setErro("");
+  setModalAgenda(true);
+}
+
+async function criarNotificacao(titulo: string, mensagem: string, tipo = "sistema") {
+  const { data, error } = await supabase
+    .from("notificacoes")
+    .insert({ titulo, mensagem, tipo, lida: false })
+    .select("id, titulo, mensagem, tipo, lida, created_at")
+    .single();
+
+  if (!error && data) {
+    setNotificacoes((anteriores) => [data as Notificacao, ...anteriores].slice(0, 30));
+  }
+}
+
+function solicitarNotificacoes() {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    setNotificacaoPermissao("unsupported");
+    return;
+  }
+
+  Notification.requestPermission().then((permissao) => {
+    setNotificacaoPermissao(permissao);
+  });
+}
+
+function mostrarNotificacao(titulo: string, mensagem: string) {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+
+  try {
+    new Notification(titulo, {
+      body: mensagem,
+      icon: "/favicon.ico",
+      tag: `plano-juntos-${titulo}`,
+    });
+  } catch {
+    // Alguns navegadores bloqueiam Notification fora de um contexto permitido.
+  }
+}
+
+function verificarLembretes() {
+  const hoje = new Date();
+  const hojeTexto = dataHojeLocal();
+  const amanha = new Date(hoje);
+  amanha.setDate(amanha.getDate() + 1);
+  const amanhaTexto = `${amanha.getFullYear()}-${String(amanha.getMonth() + 1).padStart(2, "0")}-${String(amanha.getDate()).padStart(2, "0")}`;
+
+  agendaEventos.forEach((evento) => {
+    if (evento.concluido) return;
+
+    if (evento.data === hojeTexto) {
+      mostrarNotificacao("❤️ Plano Juntos", `Hoje: ${evento.titulo}${evento.hora ? ` às ${evento.hora}` : ""}.`);
+    } else if (evento.data === amanhaTexto) {
+      mostrarNotificacao("📅 Lembrete", `Amanhã: ${evento.titulo}${evento.hora ? ` às ${evento.hora}` : ""}.`);
+    }
+  });
+}
+
+async function salvarEvento(evento: FormEvent) {
+  evento.preventDefault();
+  setErro("");
+
+  if (!tituloEvento.trim()) {
+    setErro("Digite um título para a programação.");
+    return;
+  }
+
+  if (!dataEvento) {
+    setErro("Escolha uma data.");
+    return;
+  }
+
+  setSalvandoEvento(true);
+
+  const dados = {
+    titulo: tituloEvento.trim(),
+    data: dataEvento,
+    hora: horaEvento || null,
+    categoria: categoriaEvento,
+    descricao: descricaoEvento.trim() || null,
+    recorrencia: recorrenciaEvento,
+  };
+
+  const resultado = eventoEditando
+    ? await supabase.from("agenda_eventos").update(dados).eq("id", eventoEditando.id).select("id, titulo, data, hora, categoria, descricao, recorrencia, concluido, created_at").single()
+    : await supabase.from("agenda_eventos").insert({ ...dados, concluido: false }).select("id, titulo, data, hora, categoria, descricao, recorrencia, concluido, created_at").single();
+
+  if (resultado.error) {
+    setErro(resultado.error.message);
+    setSalvandoEvento(false);
+    return;
+  }
+
+  const novoEvento = resultado.data as AgendaEvento;
+  setAgendaEventos((anteriores) => eventoEditando
+    ? anteriores.map((item) => item.id === novoEvento.id ? novoEvento : item)
+    : [...anteriores, novoEvento].sort((a, b) => `${a.data}${a.hora || ""}`.localeCompare(`${b.data}${b.hora || ""}`))
+  );
+
+  await criarNotificacao(
+    eventoEditando ? "📅 Programação atualizada" : "📅 Nova programação",
+    `${novoEvento.titulo} — ${formatarDataAgenda(novoEvento.data)}${novoEvento.hora ? ` às ${novoEvento.hora}` : ""}.`,
+    "agenda"
+  );
+
+  setModalAgenda(false);
+  setEventoEditando(null);
+  setSalvandoEvento(false);
+}
+
+async function alternarConclusaoEvento(evento: AgendaEvento) {
+  const novoStatus = !evento.concluido;
+  const { error } = await supabase.from("agenda_eventos").update({ concluido: novoStatus }).eq("id", evento.id);
+
+  if (error) {
+    setErro(error.message);
+    return;
+  }
+
+  setAgendaEventos((anteriores) => anteriores.map((item) => item.id === evento.id ? { ...item, concluido: novoStatus } : item));
+}
+
+async function excluirEvento() {
+  if (!eventoParaExcluir) return;
+  setExcluindoEvento(true);
+
+  const { error } = await supabase.from("agenda_eventos").delete().eq("id", eventoParaExcluir.id);
+
+  if (error) {
+    setErro(error.message);
+    setExcluindoEvento(false);
+    return;
+  }
+
+  setAgendaEventos((anteriores) => anteriores.filter((item) => item.id !== eventoParaExcluir.id));
+  setEventoParaExcluir(null);
+  setExcluindoEvento(false);
+}
+
+async function marcarNotificacaoComoLida(id: string) {
+  const { error } = await supabase.from("notificacoes").update({ lida: true }).eq("id", id);
+  if (!error) {
+    setNotificacoes((anteriores) => anteriores.map((item) => item.id === id ? { ...item, lida: true } : item));
+  }
+}
+
+function formatarDataAgenda(dataTexto: string) {
+  const [ano, mes, dia] = dataTexto.split("-").map(Number);
+  return new Date(ano, mes - 1, dia).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function diasDoMesAgenda() {
+  const primeiro = new Date(anoAgenda, mesAgenda, 1);
+  const quantidade = new Date(anoAgenda, mesAgenda + 1, 0).getDate();
+  const inicio = primeiro.getDay();
+  return Array.from({ length: inicio + quantidade }, (_, index) => index < inicio ? null : index - inicio + 1);
+}
+
+function mudarMesAgenda(direcao: number) {
+  const data = new Date(anoAgenda, mesAgenda + direcao, 1);
+  setMesAgenda(data.getMonth());
+  setAnoAgenda(data.getFullYear());
 }
 
 /* ================================================= */
@@ -645,20 +821,12 @@ if (error) {
   return;
 }
 
-const valorNotificacaoAporte = Number(valor);
-
 setPessoaSelecionada("");
 setValor("");
 setObservacao("");
 
 setModalAporteAberto(false);
 setSalvandoAporte(false);
-
-await registrarNotificacao(
-  "Novo aporte registrado",
-  `Um novo aporte de ${formatarMoeda(valorNotificacaoAporte)} foi adicionado.`,
-  "financeiro"
-);
 
 await buscarDados();
 
@@ -730,16 +898,9 @@ if (error) {
   return;
 }
 
-const valorNotificacao = Number(valorEdicao);
 setAporteEditando(null);
 
 setSalvandoEdicaoAporte(false);
-
-await registrarNotificacao(
-  "Aporte atualizado",
-  `Um aporte foi atualizado para ${formatarMoeda(valorNotificacao)}.`,
-  "financeiro"
-);
 
 await buscarDados();
 
@@ -775,12 +936,6 @@ if (error) {
 setAporteParaExcluir(null);
 
 setExcluindoAporte(false);
-
-await registrarNotificacao(
-  "Aporte removido",
-  "Um aporte foi removido do planejamento financeiro.",
-  "financeiro"
-);
 
 await buscarDados();
 
@@ -869,12 +1024,6 @@ setMeta(
 setModalMetaPrincipal(false);
 
 setSalvandoMetaPrincipal(false);
-
-await registrarNotificacao(
-  "Meta principal atualizada",
-  `A meta principal agora é ${formatarMoeda(Number(metaPrincipalEditando))}.`,
-  "meta"
-);
 
 await buscarDados();
 
@@ -1014,12 +1163,6 @@ setModalPlanejamento(false);
 
 setSalvandoPlanejamento(false);
 
-await registrarNotificacao(
-  "Meta mensal atualizada",
-  `A meta de ${nomeDoMes(mesPlanejamento)} de ${anoPlanejamento} foi atualizada.`,
-  "meta"
-);
-
 await buscarDados();
 
 }
@@ -1108,12 +1251,6 @@ setObservacaoItem("");
 setModalItem(false);
 
 setSalvandoItem(false);
-
-await registrarNotificacao(
-  "Novo item adicionado",
-  `${nomeItem.trim()} foi adicionado ao planejamento.`,
-  "casa"
-);
 
 await buscarDados();
 
@@ -1248,16 +1385,9 @@ if (error) {
   return;
 }
 
-const nomeNotificacaoItem = nomeItemEdicao.trim();
 setItemEditando(null);
 
 setSalvandoEdicaoItem(false);
-
-await registrarNotificacao(
-  "Item atualizado",
-  `${nomeNotificacaoItem} foi atualizado.`,
-  "casa"
-);
 
 await buscarDados();
 
@@ -1290,234 +1420,12 @@ if (error) {
   return;
 }
 
-const nomeExcluido = itemParaExcluir.nome;
 setItemParaExcluir(null);
 
 setExcluindoItem(false);
 
-await registrarNotificacao(
-  "Item removido",
-  `${nomeExcluido} foi removido do planejamento.`,
-  "casa"
-);
-
 await buscarDados();
 
-}
-
-/* ================================================= */
-/* NOSSA AGENDA */
-/* ================================================= */
-
-function dataLocalString(
-dataBase = new Date()
-) {
-  const ano = dataBase.getFullYear();
-  const mes = String(dataBase.getMonth() + 1).padStart(2, "0");
-  const dia = String(dataBase.getDate()).padStart(2, "0");
-  return `${ano}-${mes}-${dia}`;
-}
-
-function abrirNovoEvento(dataSelecionada = dataLocalString()) {
-  setEventoEditando(null);
-  setTituloEvento("");
-  setDataEvento(dataSelecionada);
-  setHorarioEvento("");
-  setCategoriaEvento("Fazer juntos");
-  setDescricaoEvento("");
-  setRecorrenciaEvento("nenhuma");
-  setErro("");
-  setModalAgenda(true);
-}
-
-function abrirEdicaoEvento(evento: EventoAgenda) {
-  setEventoEditando(evento);
-  setTituloEvento(evento.titulo);
-  setDataEvento(evento.data);
-  setHorarioEvento(evento.horario || "");
-  setCategoriaEvento(evento.categoria || "Fazer juntos");
-  setDescricaoEvento(evento.descricao || "");
-  setRecorrenciaEvento(evento.recorrencia || "nenhuma");
-  setErro("");
-  setModalAgenda(true);
-}
-
-async function salvarEventoAgenda(evento: FormEvent) {
-  evento.preventDefault();
-  setErro("");
-
-  if (!tituloEvento.trim()) {
-    setErro("Digite o título da programação.");
-    return;
-  }
-
-  if (!dataEvento) {
-    setErro("Escolha uma data.");
-    return;
-  }
-
-  setSalvandoEvento(true);
-
-  const dados = {
-    titulo: tituloEvento.trim(),
-    data: dataEvento,
-    horario: horarioEvento || null,
-    categoria: categoriaEvento || "Outros",
-    descricao: descricaoEvento.trim() || null,
-    recorrencia: recorrenciaEvento || "nenhuma",
-    concluido: eventoEditando?.concluido || false,
-  };
-
-  const resposta = eventoEditando
-    ? await supabase
-        .from("agenda_eventos")
-        .update(dados)
-        .eq("id", eventoEditando.id)
-    : await supabase
-        .from("agenda_eventos")
-        .insert(dados);
-
-  if (resposta.error) {
-    setErro(resposta.error.message);
-    setSalvandoEvento(false);
-    return;
-  }
-
-  const tituloNotificacao = eventoEditando
-    ? "Programação atualizada"
-    : "Nova programação adicionada";
-
-  setModalAgenda(false);
-  setEventoEditando(null);
-  setSalvandoEvento(false);
-
-  await registrarNotificacao(
-    tituloNotificacao,
-    `${dados.titulo} — ${dados.data}${dados.horario ? ` às ${dados.horario}` : ""}.`,
-    "agenda"
-  );
-
-  await buscarDados();
-}
-
-async function alternarConcluidoEvento(evento: EventoAgenda) {
-  const novoStatus = !evento.concluido;
-
-  const { error } = await supabase
-    .from("agenda_eventos")
-    .update({ concluido: novoStatus })
-    .eq("id", evento.id);
-
-  if (error) {
-    setErro(error.message);
-    return;
-  }
-
-  await registrarNotificacao(
-    novoStatus ? "Programação concluída" : "Programação reaberta",
-    `${evento.titulo} foi ${novoStatus ? "marcada como concluída" : "marcada novamente como pendente"}.`,
-    "agenda"
-  );
-
-  await buscarDados();
-}
-
-async function excluirEventoAgenda(evento: EventoAgenda) {
-  const { error } = await supabase
-    .from("agenda_eventos")
-    .delete()
-    .eq("id", evento.id);
-
-  if (error) {
-    setErro(error.message);
-    return;
-  }
-
-  await registrarNotificacao(
-    "Programação removida",
-    `${evento.titulo} foi removida da nossa agenda.`,
-    "agenda"
-  );
-
-  await buscarDados();
-}
-
-function eventoAconteceNoDia(evento: EventoAgenda, dia: number) {
-  const dataOriginal = new Date(`${evento.data}T12:00:00`);
-  if (dataOriginal.getDate() !== dia) {
-    if (evento.recorrencia === "mensal") {
-      return true;
-    }
-    if (evento.recorrencia === "anual") {
-      return dataOriginal.getMonth() === mesAgenda;
-    }
-    return false;
-  }
-
-  if (evento.recorrencia === "anual") {
-    return dataOriginal.getMonth() === mesAgenda;
-  }
-
-  return true;
-}
-
-function formatarDataAgenda(dataString: string) {
-  return new Date(`${dataString}T12:00:00`).toLocaleDateString("pt-BR");
-}
-
-function eventosDoDia(dia: number) {
-  return eventosAgenda.filter((evento) => {
-    const dataOriginal = new Date(`${evento.data}T12:00:00`);
-
-    if (evento.recorrencia === "mensal") {
-      return dataOriginal.getDate() === dia;
-    }
-
-    if (evento.recorrencia === "anual") {
-      return dataOriginal.getDate() === dia && dataOriginal.getMonth() === mesAgenda;
-    }
-
-    return dataOriginal.getDate() === dia &&
-      dataOriginal.getMonth() === mesAgenda &&
-      dataOriginal.getFullYear() === anoAgenda;
-  });
-}
-
-function mudarMesAgenda(direcao: number) {
-  const novaData = new Date(anoAgenda, mesAgenda + direcao, 1);
-  setMesAgenda(novaData.getMonth());
-  setAnoAgenda(novaData.getFullYear());
-}
-
-async function marcarNotificacaoComoLida(id: string) {
-  const { error } = await supabase
-    .from("notificacoes")
-    .update({ lida: true })
-    .eq("id", id);
-
-  if (!error) {
-    setNotificacoes((atual) =>
-      atual.map((item) =>
-        item.id === id ? { ...item, lida: true } : item
-      )
-    );
-  }
-}
-
-async function marcarTodasNotificacoesComoLidas() {
-  const pendentes = notificacoes.filter((item) => !item.lida);
-  if (pendentes.length === 0) return;
-
-  const { error } = await supabase
-    .from("notificacoes")
-    .update({ lida: true })
-    .eq("lida", false);
-
-  if (!error) {
-    setNotificacoes((atual) =>
-      atual.map((item) => ({ ...item, lida: true }))
-    );
-  }
 }
 
 /* ================================================= */
@@ -1842,6 +1750,21 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
         <button
           onClick={() =>
             setAbaAtiva(
+              "agenda"
+            )
+          }
+          className={`w-full text-left px-4 py-3 rounded-xl transition font-medium ${
+            abaAtiva === "agenda"
+              ? "bg-pink-50 text-pink-600"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          ❤️ Nossa Agenda
+        </button>
+
+        <button
+          onClick={() =>
+            setAbaAtiva(
               "enxoval"
             )
           }
@@ -1853,19 +1776,6 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
           }`}
         >
           🧺 Enxoval
-        </button>
-
-        <button
-          onClick={() =>
-            setAbaAtiva("agenda")
-          }
-          className={`w-full text-left px-4 py-3 rounded-xl transition font-medium ${
-            abaAtiva === "agenda"
-              ? "bg-pink-50 text-pink-600"
-              : "text-slate-600 hover:bg-slate-100"
-          }`}
-        >
-          ❤️ Nossa Agenda
         </button>
 
       </nav>
@@ -1913,6 +1823,11 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
             </p>
 
           </div>
+
+          <button onClick={() => setNotificacoesAbertas(!notificacoesAbertas)} className="relative ml-auto shrink-0 w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center">
+            🔔
+            {notificacoes.filter((item) => !item.lida).length > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{notificacoes.filter((item) => !item.lida).length}</span>}
+          </button>
 
         </div>
 
@@ -1972,70 +1887,17 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
       <div className="w-full min-w-0 p-4 sm:p-5 md:p-10 max-w-7xl mx-auto">
 
         <div className="flex justify-end mb-4 relative">
-          <button
-            type="button"
-            onClick={() => setNotificacoesAbertas((aberta) => !aberta)}
-            className="relative w-11 h-11 rounded-xl bg-white border border-slate-200 shadow-sm hover:bg-slate-50 text-xl"
-            aria-label="Notificações"
-          >
+          <button onClick={() => setNotificacoesAbertas(!notificacoesAbertas)} className="relative w-11 h-11 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
             🔔
-            {notificacoes.filter((item) => !item.lida).length > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-pink-500 text-white text-[11px] font-bold flex items-center justify-center">
-                {notificacoes.filter((item) => !item.lida).length > 9 ? "9+" : notificacoes.filter((item) => !item.lida).length}
-              </span>
-            )}
+            {notificacoes.filter((item) => !item.lida).length > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">{notificacoes.filter((item) => !item.lida).length}</span>}
           </button>
-
-          {notificacoesAbertas && (
-            <div className="absolute right-0 top-12 z-50 w-[min(92vw,380px)] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
-              <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-bold text-slate-800">🔔 Novidades</h3>
-                  <p className="text-xs text-slate-500 mt-1">Atualizações do Plano Juntos</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={marcarTodasNotificacoesComoLidas}
-                  className="text-xs text-blue-600 font-semibold hover:underline"
-                >
-                  Marcar lidas
-                </button>
-              </div>
-
-              <div className="max-h-80 overflow-y-auto">
-                {notificacoes.length === 0 ? (
-                  <div className="p-6 text-center text-sm text-slate-500">
-                    Nenhuma novidade por enquanto.
-                  </div>
-                ) : (
-                  notificacoes.map((item) => (
-                    <button
-                      type="button"
-                      key={item.id}
-                      onClick={() => marcarNotificacaoComoLida(item.id)}
-                      className={`w-full text-left p-4 border-b border-slate-100 hover:bg-slate-50 ${item.lida ? "bg-white" : "bg-blue-50/40"}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="text-lg">
-                          {item.tipo === "agenda" ? "❤️" : item.tipo === "financeiro" ? "💰" : item.tipo === "casa" ? "🏠" : "🔔"}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-sm text-slate-800 break-words">{item.titulo}</p>
-                          <p className="text-xs text-slate-500 mt-1 break-words">{item.mensagem}</p>
-                          {item.created_at && (
-                            <p className="text-[11px] text-slate-400 mt-2">
-                              {new Date(item.created_at).toLocaleString("pt-BR")}
-                            </p>
-                          )}
-                        </div>
-                        {!item.lida && <span className="w-2 h-2 rounded-full bg-blue-500 mt-2 shrink-0" />}
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
+          {notificacoesAbertas && <div className="absolute right-0 top-12 z-30 w-[min(92vw,380px)] bg-white border border-slate-200 rounded-2xl shadow-xl p-3">
+            <div className="flex items-center justify-between px-2 py-2"><strong>🔔 Notificações</strong><button onClick={() => notificacoes.forEach((n) => !n.lida && marcarNotificacaoComoLida(n.id))} className="text-xs text-blue-600">Marcar lidas</button></div>
+            <div className="max-h-80 overflow-y-auto space-y-2">
+              {notificacoes.slice(0,10).map((n) => <button key={n.id} onClick={() => marcarNotificacaoComoLida(n.id)} className={`w-full text-left p-3 rounded-xl ${n.lida ? "bg-slate-50" : "bg-blue-50"}`}><p className="font-semibold text-sm">{n.titulo}</p><p className="text-xs text-slate-500 mt-1 break-words">{n.mensagem}</p></button>)}
+              {notificacoes.length === 0 && <p className="text-sm text-slate-400 p-4 text-center">Nenhuma notificação.</p>}
             </div>
-          )}
+          </div>}
         </div>
 
         {erro && (
@@ -2835,156 +2697,84 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
 
         {/* NOSSA AGENDA */}
 
-        {abaAtiva ===
-          "agenda" && (
-          <>
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-6 sm:mb-8">
-              <div className="min-w-0">
-                <p className="text-pink-500 font-semibold">
-                  Momentos, compromissos e datas especiais
-                </p>
-                <h2 className="text-3xl md:text-4xl font-bold mt-2 break-words">
-                  ❤️ Nossa Agenda
-                </h2>
-                <p className="text-slate-500 mt-2 max-w-2xl">
-                  Organizem o que vocês querem fazer juntos e as datas importantes que não podem esquecer.
-                </p>
+        {abaAtiva === "agenda" && (
+          <section>
+            <div className="bg-gradient-to-br from-blue-50 to-pink-50 border border-blue-100 rounded-2xl sm:rounded-3xl p-5 sm:p-8 mb-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-pink-500 font-semibold">❤️ Nossa Agenda</p>
+                  <h2 className="text-2xl sm:text-3xl font-bold mt-1">Momentos, compromissos e datas importantes</h2>
+                  <p className="text-slate-500 mt-2">Organizem juntos o que não pode ser esquecido.</p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                  <button onClick={solicitarNotificacoes} className="px-4 py-3 rounded-xl bg-white border border-slate-200 font-semibold text-slate-700">
+                    🔔 {notificacaoPermissao === "granted" ? "Notificações ativas" : "Ativar notificações"}
+                  </button>
+                  <button onClick={() => abrirNovoEvento()} className="px-5 py-3 rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-semibold">
+                    + Nova programação
+                  </button>
+                </div>
               </div>
-
-              <button
-                type="button"
-                onClick={() => abrirNovoEvento()}
-                className="w-full sm:w-auto shrink-0 bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-2xl font-semibold shadow-sm"
-              >
-                + Adicionar programação
-              </button>
             </div>
 
-            <section className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-widest text-pink-500 font-bold">
-                    Calendário
-                  </p>
-                  <h3 className="text-2xl font-bold mt-1">
-                    {nomeDoMes(mesAgenda + 1)} {anoAgenda}
-                  </h3>
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-sm mb-6">
+              <div className="flex items-center justify-between gap-3 mb-5">
+                <button onClick={() => mudarMesAgenda(-1)} className="w-10 h-10 rounded-xl bg-slate-100">←</button>
+                <div className="text-center">
+                  <h3 className="text-lg sm:text-xl font-bold">{nomeDoMes(mesAgenda + 1)} {anoAgenda}</h3>
+                  <button onClick={() => { const hoje = new Date(); setMesAgenda(hoje.getMonth()); setAnoAgenda(hoje.getFullYear()); }} className="text-sm text-blue-600 font-medium mt-1">Hoje</button>
                 </div>
-
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => mudarMesAgenda(-1)} className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50">
-                    ←
-                  </button>
-                  <button type="button" onClick={() => { setMesAgenda(new Date().getMonth()); setAnoAgenda(new Date().getFullYear()); }} className="px-4 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-medium">
-                    Hoje
-                  </button>
-                  <button type="button" onClick={() => mudarMesAgenda(1)} className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50">
-                    →
-                  </button>
-                </div>
+                <button onClick={() => mudarMesAgenda(1)} className="w-10 h-10 rounded-xl bg-slate-100">→</button>
               </div>
 
-              <div className="p-3 sm:p-5 overflow-x-auto">
-                <div className="min-w-[620px]">
-                  <div className="grid grid-cols-7 mb-2">
-                    {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((dia) => (
-                      <div key={dia} className="text-center text-xs sm:text-sm font-bold text-slate-400 py-2">
-                        {dia}
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
+                {["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"].map((dia) => <div key={dia} className="text-center text-[10px] sm:text-xs font-semibold text-slate-400 py-2">{dia}</div>)}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                {diasDoMesAgenda().map((dia, index) => {
+                  if (!dia) return <div key={`vazio-${index}`} className="min-h-16 sm:min-h-24" />;
+                  const dataDia = `${anoAgenda}-${String(mesAgenda + 1).padStart(2,"0")}-${String(dia).padStart(2,"0")}`;
+                  const eventosDia = agendaEventos.filter((evento) => evento.data === dataDia);
+                  const hoje = dataDia === dataHojeLocal();
+                  return (
+                    <button key={dataDia} onClick={() => abrirNovoEvento(dataDia)} className={`text-left min-h-16 sm:min-h-24 p-1.5 sm:p-2 rounded-xl border transition ${hoje ? "border-blue-400 bg-blue-50" : "border-slate-100 hover:border-blue-200 bg-slate-50/50"}`}>
+                      <span className={`text-xs sm:text-sm font-bold ${hoje ? "text-blue-600" : "text-slate-700"}`}>{dia}</span>
+                      <div className="mt-1 space-y-1">
+                        {eventosDia.slice(0,2).map((evento) => <div key={evento.id} className={`text-[9px] sm:text-xs rounded-md px-1 py-0.5 truncate ${evento.concluido ? "bg-slate-200 text-slate-400 line-through" : evento.categoria === "Data importante" ? "bg-pink-100 text-pink-600" : "bg-blue-100 text-blue-600"}`}>{evento.titulo}</div>)}
+                        {eventosDia.length > 2 && <div className="text-[9px] text-slate-400">+{eventosDia.length - 2}</div>}
                       </div>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-7 border-l border-t border-slate-200 rounded-xl overflow-hidden">
-                    {Array.from({ length: new Date(anoAgenda, mesAgenda, 1).getDay() + new Date(anoAgenda, mesAgenda + 1, 0).getDate() }).map((_, indice) => {
-                      const primeiroDia = new Date(anoAgenda, mesAgenda, 1).getDay();
-                      const dia = indice - primeiroDia + 1;
-                      const valido = dia >= 1;
-                      const eventos = valido ? eventosDoDia(dia) : [];
-                      const hojeAgora = new Date();
-                      const ehHoje = valido &&
-                        hojeAgora.getDate() === dia &&
-                        hojeAgora.getMonth() === mesAgenda &&
-                        hojeAgora.getFullYear() === anoAgenda;
-
-                      return (
-                        <button
-                          type="button"
-                          key={indice}
-                          disabled={!valido}
-                          onClick={() => valido && abrirNovoEvento(`${anoAgenda}-${String(mesAgenda + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`)}
-                          className={`min-h-[92px] sm:min-h-[112px] text-left align-top p-2 border-r border-b border-slate-200 transition ${valido ? "bg-white hover:bg-pink-50/40" : "bg-slate-50"}`}
-                        >
-                          {valido && (
-                            <>
-                              <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${ehHoje ? "bg-pink-500 text-white" : "text-slate-600"}`}>
-                                {dia}
-                              </span>
-
-                              <div className="mt-1 space-y-1">
-                                {eventos.slice(0, 3).map((evento) => (
-                                  <span
-                                    key={evento.id}
-                                    onClick={(e) => { e.stopPropagation(); abrirEdicaoEvento(evento); }}
-                                    className={`block rounded-lg px-2 py-1 text-[11px] leading-tight font-medium truncate ${evento.concluido ? "bg-slate-100 text-slate-400 line-through" : evento.categoria === "Data importante" ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"}`}
-                                  >
-                                    {evento.horario ? `${evento.horario} ` : ""}{evento.titulo}
-                                  </span>
-                                ))}
-                                {eventos.length > 3 && (
-                                  <span className="text-[10px] text-slate-400 px-1">+{eventos.length - 3} mais</span>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                    </button>
+                  );
+                })}
               </div>
-            </section>
+            </div>
 
-            <section className="mt-5 sm:mt-6 bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <div>
-                  <h3 className="text-xl font-bold">📌 Próximas programações</h3>
-                  <p className="text-sm text-slate-500 mt-1">O que vocês não querem esquecer.</p>
-                </div>
-                <span className="text-sm text-slate-400">{eventosAgenda.length} cadastrada(s)</span>
+            <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-sm">
+              <div className="flex items-center justify-between gap-3 mb-5">
+                <div><h3 className="text-xl font-bold">Próximas programações</h3><p className="text-sm text-slate-500 mt-1">O que vem por aí para vocês.</p></div>
+                <span className="text-sm font-semibold text-slate-500">{agendaEventos.filter(e => !e.concluido && e.data >= dataHojeLocal()).length}</span>
               </div>
-
-              {eventosAgenda.length === 0 ? (
-                <div className="py-8 text-center">
-                  <div className="text-5xl">❤️</div>
-                  <p className="font-semibold mt-3">Ainda não há programações.</p>
-                  <p className="text-sm text-slate-500 mt-1">Adicionem um passeio, compromisso ou data especial.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {eventosAgenda.slice(0, 10).map((evento) => (
-                    <div key={evento.id} className="border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
-                      <button type="button" onClick={() => alternarConcluidoEvento(evento)} className={`w-11 h-11 rounded-xl shrink-0 ${evento.concluido ? "bg-green-50" : "bg-slate-50"}`}>
-                        {evento.concluido ? "✅" : "⭕"}
-                      </button>
-                      <button type="button" onClick={() => abrirEdicaoEvento(evento)} className="min-w-0 flex-1 text-left">
-                        <p className={`font-bold break-words ${evento.concluido ? "text-slate-400 line-through" : "text-slate-800"}`}>
-                          {evento.categoria === "Data importante" ? "❤️" : evento.categoria === "Compromisso" ? "📌" : evento.categoria === "Nossa casa" ? "🏠" : "💑"} {evento.titulo}
-                        </p>
-                        <p className="text-sm text-slate-500 mt-1">
-                          📅 {formatarDataAgenda(evento.data)}{evento.horario ? ` • ${evento.horario}` : ""}
-                          {evento.recorrencia && evento.recorrencia !== "nenhuma" ? ` • ${evento.recorrencia === "mensal" ? "todo mês" : "todo ano"}` : ""}
-                        </p>
-                        {evento.descricao && <p className="text-sm text-slate-500 mt-1 break-words">{evento.descricao}</p>}
-                      </button>
-                      <button type="button" onClick={() => excluirEventoAgenda(evento)} className="w-11 h-11 rounded-xl bg-red-50 text-red-500 shrink-0">
-                        🗑️
-                      </button>
+              <div className="space-y-3">
+                {agendaEventos.filter(e => !e.concluido && e.data >= dataHojeLocal()).slice(0,8).map((evento) => (
+                  <div key={evento.id} className="border border-slate-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-pink-500">{evento.categoria}</p>
+                      <h4 className="font-bold mt-1 break-words">{evento.titulo}</h4>
+                      <p className="text-sm text-slate-500 mt-1">📅 {formatarDataAgenda(evento.data)}{evento.hora ? ` • ${evento.hora}` : ""}</p>
+                      {evento.descricao && <p className="text-sm text-slate-500 mt-2 break-words">{evento.descricao}</p>}
                     </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </>
+                    <div className="flex gap-2 shrink-0">
+                      <button onClick={() => alternarConclusaoEvento(evento)} className="px-3 py-2 rounded-xl bg-emerald-50 text-emerald-600">✓</button>
+                      <button onClick={() => abrirEdicaoEvento(evento)} className="px-3 py-2 rounded-xl bg-blue-50 text-blue-600">✏️</button>
+                      <button onClick={() => setEventoParaExcluir(evento)} className="px-3 py-2 rounded-xl bg-red-50 text-red-600">🗑️</button>
+                    </div>
+                  </div>
+                ))}
+                {agendaEventos.filter(e => !e.concluido && e.data >= dataHojeLocal()).length === 0 && <p className="text-center text-slate-400 py-8">Nenhuma programação próxima. Adicionem algo para fazer juntos ❤️</p>}
+              </div>
+            </div>
+          </section>
         )}
 
         {/* ENXOVAL */}
@@ -3174,44 +2964,22 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
 
   </div>
 
-  {/* MODAL NOSSA AGENDA */}
+  {/* MODAL AGENDA */}
 
   {modalAgenda && (
     <Modal>
       <CabecalhoModal
         titulo={eventoEditando ? "✏️ Editar programação" : "❤️ Nova programação"}
-        descricao="Registre algo que vocês querem viver, lembrar ou resolver juntos."
+        descricao="Guardem aqui momentos, compromissos e datas importantes."
         fechar={() => setModalAgenda(false)}
       />
-
-      <form onSubmit={salvarEventoAgenda}>
-        <Campo
-          label="Título"
-          value={tituloEvento}
-          setValue={setTituloEvento}
-        />
-
-        <Campo
-          label="Data"
-          type="date"
-          value={dataEvento}
-          setValue={setDataEvento}
-        />
-
-        <Campo
-          label="Horário (opcional)"
-          type="time"
-          value={horarioEvento}
-          setValue={setHorarioEvento}
-        />
-
+      <form onSubmit={salvarEvento}>
+        <Campo label="Título" value={tituloEvento} setValue={setTituloEvento} />
+        <Campo label="Data" type="date" value={dataEvento} setValue={setDataEvento} />
+        <Campo label="Horário (opcional)" type="time" value={horaEvento} setValue={setHoraEvento} />
         <div className="mb-4">
           <label className="block font-medium mb-2 text-slate-700">Categoria</label>
-          <select
-            value={categoriaEvento}
-            onChange={(e) => setCategoriaEvento(e.target.value)}
-            className="w-full min-w-0 text-base border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-pink-300"
-          >
+          <select value={categoriaEvento} onChange={(e) => setCategoriaEvento(e.target.value)} className="w-full text-base border border-slate-200 rounded-xl p-3">
             <option>Fazer juntos</option>
             <option>Data importante</option>
             <option>Compromisso</option>
@@ -3219,33 +2987,28 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
             <option>Outros</option>
           </select>
         </div>
-
         <div className="mb-4">
           <label className="block font-medium mb-2 text-slate-700">Repetição</label>
-          <select
-            value={recorrenciaEvento}
-            onChange={(e) => setRecorrenciaEvento(e.target.value)}
-            className="w-full min-w-0 text-base border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-pink-300"
-          >
+          <select value={recorrenciaEvento} onChange={(e) => setRecorrenciaEvento(e.target.value)} className="w-full text-base border border-slate-200 rounded-xl p-3">
             <option value="nenhuma">Não repetir</option>
             <option value="mensal">Todo mês</option>
             <option value="anual">Todo ano</option>
           </select>
         </div>
-
-        <textarea
-          value={descricaoEvento}
-          onChange={(e) => setDescricaoEvento(e.target.value)}
-          placeholder="Observação ou detalhes (opcional)"
-          className="w-full min-w-0 text-base border border-slate-200 rounded-xl p-3 mb-5 outline-none focus:ring-2 focus:ring-pink-300"
-          rows={4}
-        />
-
-        <BotaoSalvar
-          carregando={salvandoEvento}
-          texto={eventoEditando ? "Salvar alterações" : "Adicionar à agenda"}
-        />
+        <textarea value={descricaoEvento} onChange={(e) => setDescricaoEvento(e.target.value)} placeholder="Descrição ou observação (opcional)" className="w-full text-base border border-slate-200 rounded-xl p-3 mb-5 outline-none focus:ring-2 focus:ring-blue-300" />
+        <BotaoSalvar carregando={salvandoEvento} texto={eventoEditando ? "Salvar alterações" : "Adicionar programação"} />
       </form>
+    </Modal>
+  )}
+
+  {eventoParaExcluir && (
+    <Modal>
+      <h2 className="text-xl sm:text-2xl font-bold">🗑️ Apagar programação?</h2>
+      <p className="text-slate-500 mt-3 break-words">Deseja apagar <strong>{eventoParaExcluir.titulo}</strong>?</p>
+      <div className="flex flex-col sm:flex-row gap-3 mt-6">
+        <button onClick={() => setEventoParaExcluir(null)} className="w-full flex-1 border border-slate-200 py-3 rounded-xl">Cancelar</button>
+        <button onClick={excluirEvento} disabled={excluindoEvento} className="w-full flex-1 bg-red-500 text-white py-3 rounded-xl">{excluindoEvento ? "Apagando..." : "Apagar"}</button>
+      </div>
     </Modal>
   )}
 
