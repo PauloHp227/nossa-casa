@@ -1,37 +1,69 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* =====================================================
+   BASE
+   ===================================================== */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
-html,
-body {
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+}
+
+html {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  color-scheme: light;
+}
+
+body {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background: #f8fafc;
+  color: #0f172a;
+  -webkit-tap-highlight-color: transparent;
+  color-scheme: light;
+}
+
+input,
+select,
+textarea,
+button {
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+input,
+select,
+textarea {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+img,
+svg,
+video,
+canvas,
+iframe {
+  max-width: 100%;
+}
+
+img {
+  height: auto;
 }
 
 button,
@@ -39,12 +71,197 @@ input,
 select,
 textarea {
   max-width: 100%;
+  font: inherit;
 }
 
+input,
+select,
+textarea {
+  min-width: 0;
+}
+
+button {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+textarea {
+  resize: vertical;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+}
+
+.flex,
+.inline-flex,
+.grid {
+  min-width: 0;
+}
+
+.flex > *,
+.inline-flex > *,
+.grid > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+strong,
+span,
+label {
+  overflow-wrap: anywhere;
+}
+
+/* =====================================================
+   MOBILE
+   ===================================================== */
+
 @media (max-width: 767px) {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  /* Sem zoom artificial: a viewport controla a escala. */
+  main {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  main > div {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  main .max-w-7xl {
+    width: 100%;
+    max-width: 100% !important;
+    min-width: 0;
+  }
+
+  main .overflow-x-auto {
+    max-width: 100%;
+    min-width: 0;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  main .overflow-x-auto::-webkit-scrollbar {
+    display: none;
+  }
+
   input,
   select,
   textarea {
-    font-size: 16px;
+    font-size: 16px !important;
+  }
+
+  main .rounded-2xl,
+  main .rounded-3xl {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .fixed.inset-0 {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  h1 {
+    line-height: 1.2 !important;
+  }
+
+  h2 {
+    line-height: 1.2 !important;
+  }
+
+  h3 {
+    line-height: 1.25 !important;
+  }
+
+  main [class*="w-["] {
+    max-width: 100%;
+  }
+
+  main .p-6 {
+    padding: 1rem;
+  }
+
+  main .text-xl {
+    line-height: 1.25;
+  }
+
+  main .w-11.h-11 {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+  }
+}
+
+/* =====================================================
+   CELULARES PEQUENOS
+   ===================================================== */
+
+@media (max-width: 400px) {
+  /* Mantém a escala normal; apenas compacta espaçamentos. */
+  main .p-5 {
+    padding: 1rem;
+  }
+
+  main .p-6 {
+    padding: 1rem;
+  }
+
+  main .gap-5 {
+    gap: 1rem;
+  }
+
+  main .gap-6 {
+    gap: 1rem;
+  }
+}
+
+/* =====================================================
+   CELULARES MUITO PEQUENOS
+   ===================================================== */
+
+@media (max-width: 360px) {
+  main .p-4 {
+    padding: 0.875rem;
+  }
+
+  main .p-5,
+  main .p-6 {
+    padding: 0.875rem;
+  }
+
+  main .text-3xl {
+    font-size: 1.75rem;
+    line-height: 2.1rem;
+  }
+
+  main .text-4xl {
+    font-size: 2rem;
+    line-height: 2.25rem;
   }
 }

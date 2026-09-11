@@ -356,9 +356,7 @@ const meses = [
 "Dezembro",
 ];
 
-```
 return meses[mes - 1];
-```
 
 }
 
@@ -370,7 +368,6 @@ async function buscarDados() {
 setCarregando(true);
 setErro("");
 
-```
 try {
   const [
     respostaAportes,
@@ -474,7 +471,6 @@ try {
 } finally {
   setCarregando(false);
 }
-```
 
 }
 
@@ -487,7 +483,6 @@ evento: FormEvent
 ) {
 evento.preventDefault();
 
-```
 setErro("");
 
 if (!pessoaSelecionada) {
@@ -531,7 +526,6 @@ setModalAporteAberto(false);
 setSalvandoAporte(false);
 
 await buscarDados();
-```
 
 }
 
@@ -544,7 +538,6 @@ aporte: Aporte
 ) {
 setErro("");
 
-```
 setAporteEditando(aporte);
 
 setValorEdicao(
@@ -556,7 +549,6 @@ setDataEdicao(aporte.data);
 setObservacaoEdicao(
   aporte.observacao || ""
 );
-```
 
 }
 
@@ -565,7 +557,6 @@ evento: FormEvent
 ) {
 evento.preventDefault();
 
-```
 if (!aporteEditando) {
   return;
 }
@@ -609,7 +600,6 @@ setAporteEditando(null);
 setSalvandoEdicaoAporte(false);
 
 await buscarDados();
-```
 
 }
 
@@ -622,7 +612,6 @@ if (!aporteParaExcluir) {
 return;
 }
 
-```
 setExcluindoAporte(true);
 
 const { error } = await supabase
@@ -646,7 +635,6 @@ setAporteParaExcluir(null);
 setExcluindoAporte(false);
 
 await buscarDados();
-```
 
 }
 
@@ -659,7 +647,6 @@ evento: FormEvent
 ) {
 evento.preventDefault();
 
-```
 setErro("");
 
 if (
@@ -736,7 +723,6 @@ setModalMetaPrincipal(false);
 setSalvandoMetaPrincipal(false);
 
 await buscarDados();
-```
 
 }
 
@@ -747,7 +733,6 @@ await buscarDados();
 function abrirNovoPlanejamento() {
 const hoje = new Date();
 
-```
 setPlanejamentoEditando(null);
 
 setMesPlanejamento(
@@ -763,7 +748,6 @@ setValorMetaMensal("500");
 setErro("");
 
 setModalPlanejamento(true);
-```
 
 }
 
@@ -774,7 +758,6 @@ setPlanejamentoEditando(
 planejamento
 );
 
-```
 setMesPlanejamento(
   planejamento.mes
 );
@@ -790,7 +773,6 @@ setValorMetaMensal(
 setErro("");
 
 setModalPlanejamento(true);
-```
 
 }
 
@@ -799,7 +781,6 @@ evento: FormEvent
 ) {
 evento.preventDefault();
 
-```
 setErro("");
 
 if (
@@ -880,7 +861,6 @@ setModalPlanejamento(false);
 setSalvandoPlanejamento(false);
 
 await buscarDados();
-```
 
 }
 
@@ -893,7 +873,6 @@ evento: FormEvent
 ) {
 evento.preventDefault();
 
-```
 setErro("");
 
 if (!nomeItem.trim()) {
@@ -971,7 +950,6 @@ setModalItem(false);
 setSalvandoItem(false);
 
 await buscarDados();
-```
 
 }
 
@@ -984,7 +962,6 @@ item: ItemCasa
 ) {
 setErro("");
 
-```
 setItemEditando(item);
 
 setNomeItemEdicao(item.nome);
@@ -1019,7 +996,6 @@ setObservacaoItemEdicao(
 setCompradoItemEdicao(
   item.comprado || false
 );
-```
 
 }
 
@@ -1028,7 +1004,6 @@ evento: FormEvent
 ) {
 evento.preventDefault();
 
-```
 if (!itemEditando) {
   return;
 }
@@ -1112,7 +1087,6 @@ setItemEditando(null);
 setSalvandoEdicaoItem(false);
 
 await buscarDados();
-```
 
 }
 
@@ -1125,7 +1099,6 @@ if (!itemParaExcluir) {
 return;
 }
 
-```
 setExcluindoItem(true);
 
 const { error } = await supabase
@@ -1149,7 +1122,6 @@ setItemParaExcluir(null);
 setExcluindoItem(false);
 
 await buscarDados();
-```
 
 }
 
@@ -1183,7 +1155,6 @@ new Date(
 `${aporte.data}T12:00:00`
 );
 
-```
     return (
       dataAporte.getMonth() +
         1 ===
@@ -1201,7 +1172,6 @@ new Date(
       Number(aporte.valor),
     0
   );
-```
 
 }
 
@@ -1217,7 +1187,6 @@ new Date(
 `${aporte.data}T12:00:00`
 );
 
-```
     return (
       aporte.pessoa_id ===
         pessoaId &&
@@ -1237,7 +1206,6 @@ new Date(
       Number(aporte.valor),
     0
   );
-```
 
 }
 
@@ -1251,14 +1219,12 @@ item.valor_estimado ??
 0
 );
 
-```
 const quantidade =
   Number(
     item.quantidade || 1
   );
 
 return valor * quantidade;
-```
 
 }
 
@@ -1373,14 +1339,12 @@ if (carregando) {
 return ( <main className="min-h-screen w-full overflow-x-hidden bg-slate-50 flex items-center justify-center p-4"> <div className="w-full max-w-sm bg-white border border-slate-200 p-6 sm:p-8 rounded-3xl shadow-xl text-center"> <div className="text-5xl animate-bounce">
 🏠 </div>
 
-```
       <p className="text-slate-500 mt-4">
         Carregando nosso plano...
       </p>
     </div>
   </main>
 );
-```
 
 }
 
@@ -1388,9 +1352,8 @@ return ( <main className="min-h-screen w-full overflow-x-hidden bg-slate-50 flex
 /* TELA */
 /* ================================================= */
 
-return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 text-slate-800"> <div className="flex min-h-screen w-full">
+return ( <main className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidden bg-slate-50 text-slate-800"> <div className="flex min-h-screen w-full min-w-0">
 
-```
     {/* MENU DESKTOP */}
 
     <aside className="hidden md:flex w-72 shrink-0 bg-white border-r border-slate-200 flex-col p-6 fixed h-screen z-40">
@@ -1519,7 +1482,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
 
     {/* CONTEÚDO */}
 
-    <div className="flex-1 min-w-0 w-full md:ml-72">
+    <div className="flex-1 min-w-0 w-full max-w-full md:ml-72">
 
       {/* MENU MOBILE */}
 
@@ -1545,7 +1508,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
 
         </div>
 
-        <div className="flex gap-2 overflow-x-auto px-4 pb-4">
+        <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto px-4 pb-4 overscroll-x-contain">
 
           {[
             [
@@ -1594,7 +1557,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
 
       {/* CONTEÚDO */}
 
-      <div className="w-full min-w-0 p-4 sm:p-5 md:p-10 max-w-7xl mx-auto">
+      <div className="w-full min-w-0 max-w-7xl mx-auto p-4 sm:p-5 md:p-10">
 
         {erro && (
           <div className="mb-6 break-words bg-red-50 border border-red-200 text-red-600 p-4 rounded-2xl">
@@ -3217,7 +3180,6 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
   )}
 
 </main>
-```
 
 );
 }
@@ -3233,10 +3195,9 @@ children: React.ReactNode;
 }) {
 return ( <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm overflow-y-auto">
 
-```
   <div className="min-h-full w-full flex items-end sm:items-center justify-center">
 
-    <div className="w-full max-w-md max-h-[92vh] overflow-y-auto bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 my-0 sm:my-8">
+    <div className="w-[calc(100%-1rem)] max-w-md max-h-[92vh] overflow-y-auto overflow-x-hidden bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl p-5 sm:p-6 my-0 sm:my-8">
 
       {children}
 
@@ -3245,7 +3206,6 @@ return ( <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm ove
   </div>
 
 </div>
-```
 
 );
 }
@@ -3265,7 +3225,6 @@ fechar: () => void;
 }) {
 return ( <div className="flex items-start justify-between gap-3 mb-6">
 
-```
   <div className="min-w-0">
 
     <h2 className="text-xl sm:text-2xl font-bold break-words">
@@ -3287,7 +3246,6 @@ return ( <div className="flex items-start justify-between gap-3 mb-6">
   </button>
 
 </div>
-```
 
 );
 }
@@ -3311,7 +3269,6 @@ type?: string;
 }) {
 return ( <div className="mb-4">
 
-```
   <label className="block font-medium mb-2 text-slate-700">
 
     {label}
@@ -3335,7 +3292,6 @@ return ( <div className="mb-4">
   />
 
 </div>
-```
 
 );
 }
@@ -3359,7 +3315,6 @@ pessoas: Pessoa[];
 }) {
 return ( <div className="mb-4">
 
-```
   <label className="block font-medium mb-2 text-slate-700">
 
     {label}
@@ -3398,7 +3353,6 @@ return ( <div className="mb-4">
   </select>
 
 </div>
-```
 
 );
 }
@@ -3454,7 +3408,6 @@ return (
 className={`min-w-0 bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border shadow-sm ${classe}`}
 >
 
-```
   <p className="text-slate-500 break-words">
     {icone} {titulo}
   </p>
@@ -3466,7 +3419,6 @@ className={`min-w-0 bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border shadow
   </h3>
 
 </div>
-```
 
 );
 }
@@ -3517,7 +3469,6 @@ className={`min-w-0 bg-white border rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow
       }`}
 >
 
-```
   <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
 
     <div className="min-w-0">
@@ -3604,7 +3555,6 @@ className={`min-w-0 bg-white border rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow
   )}
 
 </div>
-```
 
 );
 }
