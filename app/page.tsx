@@ -653,19 +653,82 @@ function mostrarNotificacao(titulo: string, mensagem: string) {
   }
 }
 
+function dataNumerica(dataTexto: string) {
+  const [ano, mes, dia] = dataTexto.split("-").map(Number);
+  return new Date(ano, mes - 1, dia);
+}
+
+function textoData(ano: number, mes: number, dia: number) {
+  return `${ano}-${String(mes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+}
+
+function ocorrenciaDoEventoNoMes(evento: AgendaEvento, ano: number, mes: number) {
+  const original = dataNumerica(evento.data);
+  const anoOriginal = original.getFullYear();
+  const mesOriginal = original.getMonth();
+  const diaOriginal = original.getDate();
+
+  if (evento.recorrencia === "mensal") {
+    const mesAtual = new Date(ano, mes, 1);
+    const primeiroMesPermitido = new Date(anoOriginal, mesOriginal, 1);
+    if (mesAtual < primeiroMesPermitido) return null;
+
+    // Se o dia não existir no mês, usa o último dia daquele mês.
+    const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+    const dia = Math.min(diaOriginal, ultimoDia);
+    return textoData(ano, mes, dia);
+  }
+
+  if (evento.recorrencia === "anual") {
+    if (ano < anoOriginal) return null;
+    const ultimoDia = new Date(ano, mesOriginal + 1, 0).getDate();
+    const dia = Math.min(diaOriginal, ultimoDia);
+    return mes === mesOriginal ? textoData(ano, mesOriginal, dia) : null;
+  }
+
+  return ano === anoOriginal && mes === mesOriginal
+    ? evento.data
+    : null;
+}
+
+function dataOcorrenciaParaCalendario(evento: AgendaEvento, dia: number) {
+  return ocorrenciaDoEventoNoMes(evento, anoAgenda, mesAgenda) ===
+    textoData(anoAgenda, mesAgenda, dia);
+}
+
+function ocorrenciaHojeOuAmanha(evento: AgendaEvento, alvo: Date) {
+  return ocorrenciaDoEventoNoMes(evento, alvo.getFullYear(), alvo.getMonth()) ===
+    textoData(alvo.getFullYear(), alvo.getMonth(), alvo.getDate());
+}
+
+function proximaOcorrencia(evento: AgendaEvento) {
+  const hoje = dataNumerica(dataHojeLocal());
+  const original = dataNumerica(evento.data);
+
+  if (evento.recorrencia === "nenhuma" || !evento.recorrencia) {
+    return original >= hoje ? evento.data : null;
+  }
+
+  for (let deslocamento = 0; deslocamento <= 24; deslocamento++) {
+    const mesTeste = new Date(hoje.getFullYear(), hoje.getMonth() + deslocamento, 1);
+    const data = ocorrenciaDoEventoNoMes(evento, mesTeste.getFullYear(), mesTeste.getMonth());
+    if (data && dataNumerica(data) >= hoje) return data;
+  }
+
+  return null;
+}
+
 function verificarLembretes() {
   const hoje = new Date();
-  const hojeTexto = dataHojeLocal();
   const amanha = new Date(hoje);
   amanha.setDate(amanha.getDate() + 1);
-  const amanhaTexto = `${amanha.getFullYear()}-${String(amanha.getMonth() + 1).padStart(2, "0")}-${String(amanha.getDate()).padStart(2, "0")}`;
 
   agendaEventos.forEach((evento) => {
     if (evento.concluido) return;
 
-    if (evento.data === hojeTexto) {
+    if (ocorrenciaHojeOuAmanha(evento, hoje)) {
       mostrarNotificacao("❤️ Plano Juntos", `Hoje: ${evento.titulo}${evento.hora ? ` às ${evento.hora}` : ""}.`);
-    } else if (evento.data === amanhaTexto) {
+    } else if (ocorrenciaHojeOuAmanha(evento, amanha)) {
       mostrarNotificacao("📅 Lembrete", `Amanhã: ${evento.titulo}${evento.hora ? ` às ${evento.hora}` : ""}.`);
     }
   });
@@ -2735,7 +2798,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                 {diasDoMesAgenda().map((dia, index) => {
                   if (!dia) return <div key={`vazio-${index}`} className="min-h-16 sm:min-h-24" />;
                   const dataDia = `${anoAgenda}-${String(mesAgenda + 1).padStart(2,"0")}-${String(dia).padStart(2,"0")}`;
-                  const eventosDia = agendaEventos.filter((evento) => evento.data === dataDia);
+                  const eventosDia = agendaEventos.filter((evento) => dataOcorrenciaParaCalendario(evento, dia));
                   const hoje = dataDia === dataHojeLocal();
                   return (
                     <button key={dataDia} onClick={() => abrirNovoEvento(dataDia)} className={`text-left min-h-16 sm:min-h-24 p-1.5 sm:p-2 rounded-xl border transition ${hoje ? "border-blue-400 bg-blue-50" : "border-slate-100 hover:border-blue-200 bg-slate-50/50"}`}>
@@ -2753,15 +2816,19 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
             <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-sm">
               <div className="flex items-center justify-between gap-3 mb-5">
                 <div><h3 className="text-xl font-bold">Próximas programações</h3><p className="text-sm text-slate-500 mt-1">O que vem por aí para vocês.</p></div>
-                <span className="text-sm font-semibold text-slate-500">{agendaEventos.filter(e => !e.concluido && e.data >= dataHojeLocal()).length}</span>
+                <span className="text-sm font-semibold text-slate-500">{agendaEventos.filter((e) => !e.concluido && proximaOcorrencia(e)).length}</span>
               </div>
               <div className="space-y-3">
-                {agendaEventos.filter(e => !e.concluido && e.data >= dataHojeLocal()).slice(0,8).map((evento) => (
+                {agendaEventos
+                  .filter((e) => !e.concluido && proximaOcorrencia(e))
+                  .sort((a, b) => (proximaOcorrencia(a) || "").localeCompare(proximaOcorrencia(b) || ""))
+                  .slice(0,8)
+                  .map((evento) => (
                   <div key={evento.id} className="border border-slate-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-pink-500">{evento.categoria}</p>
                       <h4 className="font-bold mt-1 break-words">{evento.titulo}</h4>
-                      <p className="text-sm text-slate-500 mt-1">📅 {formatarDataAgenda(evento.data)}{evento.hora ? ` • ${evento.hora}` : ""}</p>
+                      <p className="text-sm text-slate-500 mt-1">📅 {formatarDataAgenda(proximaOcorrencia(evento) || evento.data)}{evento.hora ? ` • ${evento.hora}` : ""}{evento.recorrencia === "mensal" ? " • todo mês" : evento.recorrencia === "anual" ? " • todo ano" : ""}</p>
                       {evento.descricao && <p className="text-sm text-slate-500 mt-2 break-words">{evento.descricao}</p>}
                     </div>
                     <div className="flex gap-2 shrink-0">
@@ -2771,7 +2838,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                     </div>
                   </div>
                 ))}
-                {agendaEventos.filter(e => !e.concluido && e.data >= dataHojeLocal()).length === 0 && <p className="text-center text-slate-400 py-8">Nenhuma programação próxima. Adicionem algo para fazer juntos ❤️</p>}
+                {agendaEventos.filter((e) => !e.concluido && proximaOcorrencia(e)).length === 0 && <p className="text-center text-slate-400 py-8">Nenhuma programação próxima. Adicionem algo para fazer juntos ❤️</p>}
               </div>
             </div>
           </section>
