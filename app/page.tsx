@@ -88,6 +88,17 @@ const TEMAS_ENXOVAL = [
 "Outros",
 ];
 
+const ICONES_TEMAS_ENXOVAL: Record<string, string> = {
+  Cozinha: "🍳",
+  Mesa: "🍽️",
+  Quarto: "🛏️",
+  Banheiro: "🛁",
+  Limpeza: "🧹",
+  Sala: "🛋️",
+  "Decoração": "✨",
+  Outros: "📦",
+};
+
 /* ================================================= */
 /* COMPONENTE PRINCIPAL */
 /* ================================================= */
@@ -274,6 +285,9 @@ setSalvandoPlanejamento,
 
 const [modalItem, setModalItem] =
 useState(false);
+
+const [temaEnxovalSelecionado, setTemaEnxovalSelecionado] =
+useState<string | null>(null);
 
 const [
 tipoNovoItem,
@@ -653,82 +667,19 @@ function mostrarNotificacao(titulo: string, mensagem: string) {
   }
 }
 
-function dataNumerica(dataTexto: string) {
-  const [ano, mes, dia] = dataTexto.split("-").map(Number);
-  return new Date(ano, mes - 1, dia);
-}
-
-function textoData(ano: number, mes: number, dia: number) {
-  return `${ano}-${String(mes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
-}
-
-function ocorrenciaDoEventoNoMes(evento: AgendaEvento, ano: number, mes: number) {
-  const original = dataNumerica(evento.data);
-  const anoOriginal = original.getFullYear();
-  const mesOriginal = original.getMonth();
-  const diaOriginal = original.getDate();
-
-  if (evento.recorrencia === "mensal") {
-    const mesAtual = new Date(ano, mes, 1);
-    const primeiroMesPermitido = new Date(anoOriginal, mesOriginal, 1);
-    if (mesAtual < primeiroMesPermitido) return null;
-
-    // Se o dia não existir no mês, usa o último dia daquele mês.
-    const ultimoDia = new Date(ano, mes + 1, 0).getDate();
-    const dia = Math.min(diaOriginal, ultimoDia);
-    return textoData(ano, mes, dia);
-  }
-
-  if (evento.recorrencia === "anual") {
-    if (ano < anoOriginal) return null;
-    const ultimoDia = new Date(ano, mesOriginal + 1, 0).getDate();
-    const dia = Math.min(diaOriginal, ultimoDia);
-    return mes === mesOriginal ? textoData(ano, mesOriginal, dia) : null;
-  }
-
-  return ano === anoOriginal && mes === mesOriginal
-    ? evento.data
-    : null;
-}
-
-function dataOcorrenciaParaCalendario(evento: AgendaEvento, dia: number) {
-  return ocorrenciaDoEventoNoMes(evento, anoAgenda, mesAgenda) ===
-    textoData(anoAgenda, mesAgenda, dia);
-}
-
-function ocorrenciaHojeOuAmanha(evento: AgendaEvento, alvo: Date) {
-  return ocorrenciaDoEventoNoMes(evento, alvo.getFullYear(), alvo.getMonth()) ===
-    textoData(alvo.getFullYear(), alvo.getMonth(), alvo.getDate());
-}
-
-function proximaOcorrencia(evento: AgendaEvento) {
-  const hoje = dataNumerica(dataHojeLocal());
-  const original = dataNumerica(evento.data);
-
-  if (evento.recorrencia === "nenhuma" || !evento.recorrencia) {
-    return original >= hoje ? evento.data : null;
-  }
-
-  for (let deslocamento = 0; deslocamento <= 24; deslocamento++) {
-    const mesTeste = new Date(hoje.getFullYear(), hoje.getMonth() + deslocamento, 1);
-    const data = ocorrenciaDoEventoNoMes(evento, mesTeste.getFullYear(), mesTeste.getMonth());
-    if (data && dataNumerica(data) >= hoje) return data;
-  }
-
-  return null;
-}
-
 function verificarLembretes() {
   const hoje = new Date();
+  const hojeTexto = dataHojeLocal();
   const amanha = new Date(hoje);
   amanha.setDate(amanha.getDate() + 1);
+  const amanhaTexto = `${amanha.getFullYear()}-${String(amanha.getMonth() + 1).padStart(2, "0")}-${String(amanha.getDate()).padStart(2, "0")}`;
 
   agendaEventos.forEach((evento) => {
     if (evento.concluido) return;
 
-    if (ocorrenciaHojeOuAmanha(evento, hoje)) {
+    if (evento.data === hojeTexto) {
       mostrarNotificacao("❤️ Plano Juntos", `Hoje: ${evento.titulo}${evento.hora ? ` às ${evento.hora}` : ""}.`);
-    } else if (ocorrenciaHojeOuAmanha(evento, amanha)) {
+    } else if (evento.data === amanhaTexto) {
       mostrarNotificacao("📅 Lembrete", `Amanhã: ${evento.titulo}${evento.hora ? ` às ${evento.hora}` : ""}.`);
     }
   });
@@ -2798,7 +2749,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                 {diasDoMesAgenda().map((dia, index) => {
                   if (!dia) return <div key={`vazio-${index}`} className="min-h-16 sm:min-h-24" />;
                   const dataDia = `${anoAgenda}-${String(mesAgenda + 1).padStart(2,"0")}-${String(dia).padStart(2,"0")}`;
-                  const eventosDia = agendaEventos.filter((evento) => dataOcorrenciaParaCalendario(evento, dia));
+                  const eventosDia = agendaEventos.filter((evento) => evento.data === dataDia);
                   const hoje = dataDia === dataHojeLocal();
                   return (
                     <button key={dataDia} onClick={() => abrirNovoEvento(dataDia)} className={`text-left min-h-16 sm:min-h-24 p-1.5 sm:p-2 rounded-xl border transition ${hoje ? "border-blue-400 bg-blue-50" : "border-slate-100 hover:border-blue-200 bg-slate-50/50"}`}>
@@ -2816,19 +2767,15 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
             <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-sm">
               <div className="flex items-center justify-between gap-3 mb-5">
                 <div><h3 className="text-xl font-bold">Próximas programações</h3><p className="text-sm text-slate-500 mt-1">O que vem por aí para vocês.</p></div>
-                <span className="text-sm font-semibold text-slate-500">{agendaEventos.filter((e) => !e.concluido && proximaOcorrencia(e)).length}</span>
+                <span className="text-sm font-semibold text-slate-500">{agendaEventos.filter(e => !e.concluido && e.data >= dataHojeLocal()).length}</span>
               </div>
               <div className="space-y-3">
-                {agendaEventos
-                  .filter((e) => !e.concluido && proximaOcorrencia(e))
-                  .sort((a, b) => (proximaOcorrencia(a) || "").localeCompare(proximaOcorrencia(b) || ""))
-                  .slice(0,8)
-                  .map((evento) => (
+                {agendaEventos.filter(e => !e.concluido && e.data >= dataHojeLocal()).slice(0,8).map((evento) => (
                   <div key={evento.id} className="border border-slate-100 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-pink-500">{evento.categoria}</p>
                       <h4 className="font-bold mt-1 break-words">{evento.titulo}</h4>
-                      <p className="text-sm text-slate-500 mt-1">📅 {formatarDataAgenda(proximaOcorrencia(evento) || evento.data)}{evento.hora ? ` • ${evento.hora}` : ""}{evento.recorrencia === "mensal" ? " • todo mês" : evento.recorrencia === "anual" ? " • todo ano" : ""}</p>
+                      <p className="text-sm text-slate-500 mt-1">📅 {formatarDataAgenda(evento.data)}{evento.hora ? ` • ${evento.hora}` : ""}</p>
                       {evento.descricao && <p className="text-sm text-slate-500 mt-2 break-words">{evento.descricao}</p>}
                     </div>
                     <div className="flex gap-2 shrink-0">
@@ -2838,7 +2785,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                     </div>
                   </div>
                 ))}
-                {agendaEventos.filter((e) => !e.concluido && proximaOcorrencia(e)).length === 0 && <p className="text-center text-slate-400 py-8">Nenhuma programação próxima. Adicionem algo para fazer juntos ❤️</p>}
+                {agendaEventos.filter(e => !e.concluido && e.data >= dataHojeLocal()).length === 0 && <p className="text-center text-slate-400 py-8">Nenhuma programação próxima. Adicionem algo para fazer juntos ❤️</p>}
               </div>
             </div>
           </section>
@@ -2846,190 +2793,150 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
 
         {/* ENXOVAL */}
 
-        {abaAtiva ===
-          "enxoval" && (
+        {abaAtiva === "enxoval" && (
           <>
-
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-6 sm:mb-8">
-
-              <div>
-
-                <p className="text-slate-500">
-                  Preparativos para a
-                  mudança
-                </p>
-
-                <h2 className="text-3xl md:text-4xl font-bold mt-2">
-                  🧺 Nosso enxoval
-                </h2>
-
-                <p className="text-slate-500 mt-2">
-                  Organizado por temas
-                  para facilitar nosso
-                  planejamento.
-                </p>
-
+              <div className="min-w-0">
+                <p className="text-slate-500">Preparativos para a mudança</p>
+                <h2 className="text-3xl md:text-4xl font-bold mt-2 break-words">🧺 Nosso enxoval</h2>
+                <p className="text-slate-500 mt-2">Escolham uma categoria para abrir a sua pasta de itens.</p>
               </div>
 
               <button
                 onClick={() => {
-                  setTipoNovoItem(
-                    "Enxoval"
-                  );
-
-                  setTemaItem(
-                    "Cozinha"
-                  );
-
-                  setModalItem(
-                    true
-                  );
+                  setTipoNovoItem("Enxoval");
+                  setTemaItem(temaEnxovalSelecionado || "Cozinha");
+                  setModalItem(true);
                 }}
-                className="w-full sm:w-auto bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-2xl"
+                className="w-full sm:w-auto bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-2xl font-semibold shadow-sm"
               >
                 + Adicionar item
               </button>
-
             </div>
 
-            <div className="bg-white border border-pink-100 rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-6 sm:mb-8 shadow-sm">
-
-              <p className="text-slate-500">
-                💰 Valor estimado total
-                do enxoval
-              </p>
-
-              <h3 className="text-2xl sm:text-3xl font-bold text-pink-500 mt-2 break-words">
-                {formatarMoeda(
-                  totalEnxoval
-                )}
-              </h3>
-
+            <div className="bg-white border border-pink-100 rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="text-slate-500">💰 Valor estimado total do enxoval</p>
+                  <h3 className="text-2xl sm:text-3xl font-bold text-pink-500 mt-2 break-words">
+                    {formatarMoeda(totalEnxoval)}
+                  </h3>
+                </div>
+                <div className="text-left sm:text-right">
+                  <p className="text-sm text-slate-500">Itens</p>
+                  <p className="text-xl font-bold">{itensEnxoval.length}</p>
+                </div>
+              </div>
             </div>
 
-            {TEMAS_ENXOVAL.map(
-              (tema) => {
-                const itensDoTema =
-                  itensEnxoval.filter(
-                    (item) =>
-                      (item.tema ||
-                        "Outros") ===
-                      tema
-                  );
-
-                if (
-                  itensDoTema.length ===
-                  0
-                ) {
-                  return null;
-                }
-
-                const totalTema =
-                  itensDoTema.reduce(
-                    (
-                      acumulado,
-                      item
-                    ) =>
-                      acumulado +
-                      valorDoItem(
-                        item
-                      ),
-                    0
-                  );
-
-                return (
-                  <section
-                    key={tema}
-                    className="mb-8 sm:mb-10"
-                  >
-
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
-
-                      <div>
-
-                        <h3 className="text-xl sm:text-2xl font-bold">
-                          🧺 {tema}
-                        </h3>
-
-                        <p className="text-slate-500 text-sm mt-1">
-                          {
-                            itensDoTema.length
-                          }{" "}
-                          item(ns)
-                        </p>
-
-                      </div>
-
-                      <strong className="text-pink-500 text-lg sm:text-xl">
-                        {formatarMoeda(
-                          totalTema
-                        )}
-                      </strong>
-
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-
-                      {itensDoTema.map(
-                        (item) => (
-                          <CardItem
-                            key={
-                              item.id
-                            }
-                            item={
-                              item
-                            }
-                            formatarMoeda={
-                              formatarMoeda
-                            }
-                            editar={
-                              abrirEdicaoItem
-                            }
-                            excluir={
-                              setItemParaExcluir
-                            }
-                          />
-                        )
-                      )}
-
-                    </div>
-
-                  </section>
-                );
-              }
-            )}
-
-            {itensEnxoval.length ===
-              0 && (
-              <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-8 sm:p-10 text-center">
-
-                <div className="text-6xl">
-                  🧺
+            {!temaEnxovalSelecionado ? (
+              <>
+                <div className="mb-4">
+                  <h3 className="text-xl font-bold">📁 Categorias</h3>
+                  <p className="text-sm text-slate-500 mt-1">Cada categoria funciona como uma pasta separada.</p>
                 </div>
 
-                <h3 className="text-xl font-bold mt-4">
-                  Comecem a montar o
-                  enxoval!
-                </h3>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {TEMAS_ENXOVAL.map((tema) => {
+                    const itensDoTema = itensEnxoval.filter((item) => (item.tema || "Outros") === tema);
+                    const totalTema = itensDoTema.reduce((acumulado, item) => acumulado + valorDoItem(item), 0);
+                    const comprados = itensDoTema.filter((item) => item.comprado).length;
 
-                <p className="text-slate-500 mt-2">
-                  Organize os itens por
-                  cozinha, quarto,
-                  banheiro, limpeza e
-                  muito mais.
-                </p>
+                    return (
+                      <button
+                        key={tema}
+                        type="button"
+                        onClick={() => setTemaEnxovalSelecionado(tema)}
+                        className="text-left bg-white border border-slate-200 hover:border-pink-300 hover:shadow-md rounded-2xl sm:rounded-3xl p-4 sm:p-5 transition min-w-0"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-3xl sm:text-4xl">{ICONES_TEMAS_ENXOVAL[tema]}</span>
+                          <span className="text-slate-300 text-xl">›</span>
+                        </div>
+                        <h4 className="font-bold text-base sm:text-lg mt-3 break-words">{tema}</h4>
+                        <p className="text-sm text-slate-500 mt-1">{itensDoTema.length} item(ns)</p>
+                        {itensDoTema.length > 0 && (
+                          <>
+                            <p className="text-xs text-emerald-600 mt-2">{comprados} comprado(s)</p>
+                            <p className="text-sm font-semibold text-pink-500 mt-2">{formatarMoeda(totalTema)}</p>
+                          </>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              (() => {
+                const tema = temaEnxovalSelecionado;
+                const itensDoTema = itensEnxoval.filter((item) => (item.tema || "Outros") === tema);
+                const totalTema = itensDoTema.reduce((acumulado, item) => acumulado + valorDoItem(item), 0);
+                const comprados = itensDoTema.filter((item) => item.comprado).length;
 
-              </div>
+                return (
+                  <section>
+                    <button
+                      type="button"
+                      onClick={() => setTemaEnxovalSelecionado(null)}
+                      className="mb-4 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200"
+                    >
+                      ← Voltar para categorias
+                    </button>
+
+                    <div className="bg-white border border-pink-100 rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-5 shadow-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-3">
+                            <span className="text-4xl">{ICONES_TEMAS_ENXOVAL[tema]}</span>
+                            <div className="min-w-0">
+                              <h3 className="text-2xl sm:text-3xl font-bold break-words">{tema}</h3>
+                              <p className="text-sm text-slate-500 mt-1">{itensDoTema.length} item(ns) • {comprados} comprado(s)</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="sm:text-right">
+                          <p className="text-sm text-slate-500">Valor estimado</p>
+                          <strong className="text-pink-500 text-xl">{formatarMoeda(totalTema)}</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {itensDoTema.length === 0 ? (
+                      <div className="bg-white border border-dashed border-slate-300 rounded-2xl sm:rounded-3xl p-8 text-center">
+                        <div className="text-5xl">{ICONES_TEMAS_ENXOVAL[tema]}</div>
+                        <h4 className="text-xl font-bold mt-3">Essa pasta está vazia</h4>
+                        <p className="text-slate-500 mt-2">Adicionem o primeiro item de {tema.toLowerCase()}.</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTipoNovoItem("Enxoval");
+                            setTemaItem(tema);
+                            setModalItem(true);
+                          }}
+                          className="mt-5 bg-pink-500 hover:bg-pink-600 text-white px-5 py-3 rounded-2xl font-semibold"
+                        >
+                          + Adicionar item
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+                        {itensDoTema.map((item) => (
+                          <CardItem
+                            key={item.id}
+                            item={item}
+                            formatarMoeda={formatarMoeda}
+                            editar={abrirEdicaoItem}
+                            excluir={setItemParaExcluir}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                );
+              })()
             )}
-
           </>
         )}
-
-      </div>
-
-    </div>
-
-  </div>
 
   {/* MODAL AGENDA */}
 
@@ -3717,7 +3624,10 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
     </Modal>
   )}
 
-</main>
+        </div>
+      </div>
+    </div>
+  </main>
 
 );
 }
