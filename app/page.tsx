@@ -547,22 +547,14 @@ async function ativarNotificacoesPush() {
     if (!endpoint || !p256dh || !auth) {
       throw new Error("Não foi possível obter os dados da assinatura do dispositivo.");
     }
-const { error } = await supabase
-  .from("push_subscriptions")
-  .upsert(
-    {
-      endpoint,
-      p256dh,
-      autorizacao: auth,
-      ativo: true,
-    },
-    { onConflict: "endpoint" }
-  );
 
-if (error) {
-  console.error("Erro ao salvar inscrição:", error);
-  throw error;
-}
+    const { error } = await supabase
+      .from("push_subscriptions")
+      .upsert(
+        { endpoint, p256dh, auth, ativo: true },
+        { onConflict: "endpoint" }
+      );
+
     if (error) throw error;
 
     setPushAtivo(true);
