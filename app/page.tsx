@@ -127,11 +127,6 @@ useState<Notificacao[]>([]);
 const [notificacoesAbertas, setNotificacoesAbertas] =
 useState(false);
 
-const [notificacaoPermissao, setNotificacaoPermissao] =
-useState<NotificationPermission | "unsupported">("default");
-
-const [pushAtivo, setPushAtivo] = useState(false);
-const [ativandoPush, setAtivandoPush] = useState(false);
 
 const [modalAgenda, setModalAgenda] =
 useState(false);
@@ -395,12 +390,6 @@ setExcluindoItem,
 useEffect(() => {
   buscarDados();
 
-  if (typeof window !== "undefined" && "Notification" in window) {
-    setNotificacaoPermissao(Notification.permission);
-  } else {
-    setNotificacaoPermissao("unsupported");
-  }
-
   const canal = supabase
     .channel("plano-juntos-notificacoes")
     .on(
@@ -413,20 +402,6 @@ useEffect(() => {
           if (atuais.some((item) => item.id === nova.id)) return atuais;
           return [nova, ...atuais].slice(0, 30);
         });
-
-        if (typeof window !== "undefined" &&
-            "Notification" in window &&
-            Notification.permission === "granted") {
-          try {
-            new Notification(nova.titulo, {
-              body: nova.mensagem,
-              icon: "/favicon.ico",
-              tag: `plano-juntos-${nova.id}`,
-            });
-          } catch {
-            // Alguns navegadores bloqueiam notificações fora de um contexto permitido.
-          }
-        }
       }
     )
     .subscribe();
@@ -434,19 +409,6 @@ useEffect(() => {
   return () => {
     supabase.removeChannel(canal);
   };
-}, []);
-
-/* ================================================= */
-/* SERVICE WORKER */
-/* ================================================= */
-
-useEffect(() => {
-  if (typeof window === "undefined") return;
-  if (!("serviceWorker" in navigator)) return;
-
-  navigator.serviceWorker.register("/sw.js").catch(() => {
-    // O suporte a Push continua opcional até o usuário ativar as notificações.
-  });
 }, []);
 
 /* ================================================= */
@@ -491,84 +453,6 @@ return meses[mes - 1];
 /* NOTIFICAÇÕES */
 /* ================================================= */
 
-function base64UrlToUint8Array(base64Url: string) {
-  const padding = "=".repeat((4 - (base64Url.length % 4)) % 4);
-  const base64 = (base64Url + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
-}
-
-async function ativarNotificacoesPush() {
-  if (typeof window === "undefined" || !("Notification" in window)) {
-    setNotificacaoPermissao("unsupported");
-    return;
-  }
-
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-    setErro("Este navegador não oferece suporte a notificações Push.");
-    return;
-  }
-
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  if (!publicKey) {
-    setErro("A chave pública das notificações ainda não foi configurada na Vercel.");
-    return;
-  }
-
-  setAtivandoPush(true);
-  setErro("");
-
-  try {
-    const permissao = await Notification.requestPermission();
-    setNotificacaoPermissao(permissao);
-
-    if (permissao !== "granted") {
-      setErro("Permissão para notificações não concedida.");
-      return;
-    }
-
-    const registration = await navigator.serviceWorker.register("/sw.js");
-    await navigator.serviceWorker.ready;
-
-    let subscription = await registration.pushManager.getSubscription();
-
-    if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: base64UrlToUint8Array(publicKey),
-      });
-    }
-
-    const json = subscription.toJSON();
-    const endpoint = json.endpoint;
-    const p256dh = json.keys?.p256dh;
-    const auth = json.keys?.auth;
-
-    if (!endpoint || !p256dh || !auth) {
-      throw new Error("Não foi possível obter os dados da assinatura do dispositivo.");
-    }
-
-    const { error } = await supabase
-      .from("push_subscriptions")
-      .upsert(
-        { endpoint, p256dh, auth, ativo: true },
-        { onConflict: "endpoint" }
-      );
-
-    if (error) throw error;
-
-    setPushAtivo(true);
-  } catch (error: any) {
-    setErro(error?.message || "Não foi possível ativar as notificações neste dispositivo.");
-  } finally {
-    setAtivandoPush(false);
-  }
-}
-
-function solicitarNotificacoes() {
-  void ativarNotificacoesPush();
-}
-
 async function registrarNotificacao(
 titulo: string,
 mensagem: string,
@@ -590,22 +474,6 @@ tipo = "info"
       novaNotificacao,
       ...atual,
     ].slice(0, 30));
-
-    // Envia a notificação Push para os dispositivos cadastrados.
-    // O registro no histórico continua funcionando mesmo se o Push falhar.
-    try {
-      await fetch("/api/notificacoes/push", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          notificacao: novaNotificacao,
-        }),
-      });
-    } catch {
-      // O histórico da notificação já foi salvo no Supabase.
-    }
   }
 }
 
@@ -1595,51 +1463,42 @@ async function excluirEventoAgenda(evento: EventoAgenda) {
   await buscarDados();
 }
 
-function normalizarRecorrenciaEvento(evento: EventoAgenda) {
-  const recorrencia = String(evento.recorrencia || "nenhuma")
-    .trim()
-    .toLowerCase();
-
-  if (recorrencia === "mensal" || recorrencia === "todo mês" || recorrencia === "todo mes") {
-    return "mensal";
-  }
-
-  if (recorrencia === "anual" || recorrencia === "todo ano") {
-    return "anual";
-  }
-
-  return "nenhuma";
-}
-
 function separarDataAgenda(dataString: string) {
-  const partes = String(dataString || "").slice(0, 10).split("-");
+  const [ano, mes, dia] = String(dataString || "")
+    .slice(0, 10)
+    .split("-")
+    .map(Number);
 
   return {
-    ano: Number(partes[0]) || 0,
-    mes: Number(partes[1]) || 0,
-    dia: Number(partes[2]) || 0,
+    ano: Number.isFinite(ano) ? ano : 0,
+    mes: Number.isFinite(mes) ? mes : 0,
+    dia: Number.isFinite(dia) ? dia : 0,
   };
+}
+
+function normalizarRecorrenciaEvento(evento: EventoAgenda) {
+  return String(evento.recorrencia || "nenhuma")
+    .trim()
+    .toLowerCase();
 }
 
 function eventoAconteceNoDia(evento: EventoAgenda, dia: number) {
   const dataOriginal = separarDataAgenda(evento.data);
   const recorrencia = normalizarRecorrenciaEvento(evento);
 
-  if (!dataOriginal.dia) {
-    return false;
-  }
+  if (!dataOriginal.dia || !dia) return false;
 
+  // Todo mês: mantém o mesmo dia do mês, independentemente do ano/mês.
   if (recorrencia === "mensal") {
     return dataOriginal.dia === dia;
   }
 
+  // Todo ano: mantém o mesmo dia e mês, independentemente do ano.
   if (recorrencia === "anual") {
-    return (
-      dataOriginal.dia === dia &&
-      dataOriginal.mes === mesAgenda + 1
-    );
+    return dataOriginal.dia === dia && dataOriginal.mes === mesAgenda + 1;
   }
 
+  // Evento único: somente na data original.
   return (
     dataOriginal.dia === dia &&
     dataOriginal.mes === mesAgenda + 1 &&
@@ -1648,13 +1507,7 @@ function eventoAconteceNoDia(evento: EventoAgenda, dia: number) {
 }
 
 function formatarDataAgenda(dataString: string) {
-  const data = separarDataAgenda(dataString);
-
-  if (!data.ano || !data.mes || !data.dia) {
-    return dataString;
-  }
-
-  return `${String(data.dia).padStart(2, "0")}/${String(data.mes).padStart(2, "0")}/${data.ano}`;
+  return new Date(`${dataString}T12:00:00`).toLocaleDateString("pt-BR");
 }
 
 function eventosDoDia(dia: number) {
@@ -2181,27 +2034,6 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                   Marcar lidas
                 </button>
               </div>
-
-              {notificacaoPermissao === "default" && (
-                <div className="px-4 py-3 bg-pink-50 border-b border-pink-100">
-                  <p className="text-xs text-slate-600 mb-2">Ative as notificações para receber avisos das atualizações do sistema neste dispositivo.</p>
-                  <button type="button" onClick={solicitarNotificacoes} disabled={ativandoPush} className="text-xs font-semibold bg-pink-500 disabled:opacity-60 text-white px-3 py-2 rounded-lg">
-                    {ativandoPush ? "Ativando..." : "Ativar notificações"}
-                  </button>
-                </div>
-              )}
-
-              {pushAtivo && notificacaoPermissao === "granted" && (
-                <div className="px-4 py-3 bg-green-50 border-b border-green-100">
-                  <p className="text-xs text-green-700">Notificações deste dispositivo estão ativadas.</p>
-                </div>
-              )}
-
-              {notificacaoPermissao === "denied" && (
-                <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
-                  <p className="text-xs text-slate-500">As notificações foram bloqueadas neste navegador. Você pode liberá-las nas configurações do navegador.</p>
-                </div>
-              )}
 
               <div className="max-h-80 overflow-y-auto">
                 {notificacoes.length === 0 ? (
