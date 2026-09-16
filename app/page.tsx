@@ -1595,45 +1595,72 @@ async function excluirEventoAgenda(evento: EventoAgenda) {
   await buscarDados();
 }
 
+function normalizarRecorrenciaEvento(evento: EventoAgenda) {
+  const recorrencia = String(evento.recorrencia || "nenhuma")
+    .trim()
+    .toLowerCase();
+
+  if (recorrencia === "mensal" || recorrencia === "todo mês" || recorrencia === "todo mes") {
+    return "mensal";
+  }
+
+  if (recorrencia === "anual" || recorrencia === "todo ano") {
+    return "anual";
+  }
+
+  return "nenhuma";
+}
+
+function separarDataAgenda(dataString: string) {
+  const partes = String(dataString || "").slice(0, 10).split("-");
+
+  return {
+    ano: Number(partes[0]) || 0,
+    mes: Number(partes[1]) || 0,
+    dia: Number(partes[2]) || 0,
+  };
+}
+
 function eventoAconteceNoDia(evento: EventoAgenda, dia: number) {
-  const dataOriginal = new Date(`${evento.data}T12:00:00`);
-  if (dataOriginal.getDate() !== dia) {
-    if (evento.recorrencia === "mensal") {
-      return true;
-    }
-    if (evento.recorrencia === "anual") {
-      return dataOriginal.getMonth() === mesAgenda;
-    }
+  const dataOriginal = separarDataAgenda(evento.data);
+  const recorrencia = normalizarRecorrenciaEvento(evento);
+
+  if (!dataOriginal.dia) {
     return false;
   }
 
-  if (evento.recorrencia === "anual") {
-    return dataOriginal.getMonth() === mesAgenda;
+  if (recorrencia === "mensal") {
+    return dataOriginal.dia === dia;
   }
 
-  return true;
+  if (recorrencia === "anual") {
+    return (
+      dataOriginal.dia === dia &&
+      dataOriginal.mes === mesAgenda + 1
+    );
+  }
+
+  return (
+    dataOriginal.dia === dia &&
+    dataOriginal.mes === mesAgenda + 1 &&
+    dataOriginal.ano === anoAgenda
+  );
 }
 
 function formatarDataAgenda(dataString: string) {
-  return new Date(`${dataString}T12:00:00`).toLocaleDateString("pt-BR");
+  const data = separarDataAgenda(dataString);
+
+  if (!data.ano || !data.mes || !data.dia) {
+    return dataString;
+  }
+
+  return `${String(data.dia).padStart(2, "0")}/${String(data.mes).padStart(2, "0")}/${data.ano}`;
 }
 
 function eventosDoDia(dia: number) {
-  return eventosAgenda.filter((evento) => {
-    const dataOriginal = new Date(`${evento.data}T12:00:00`);
-
-    if (evento.recorrencia === "mensal") {
-      return dataOriginal.getDate() === dia;
-    }
-
-    if (evento.recorrencia === "anual") {
-      return dataOriginal.getDate() === dia && dataOriginal.getMonth() === mesAgenda;
-    }
-
-    return dataOriginal.getDate() === dia &&
-      dataOriginal.getMonth() === mesAgenda &&
-      dataOriginal.getFullYear() === anoAgenda;
-  });
+  return eventosAgenda.filter((evento) =>
+    eventoAconteceNoDia(evento, dia)
+  );
 }
 
 function mudarMesAgenda(direcao: number) {
