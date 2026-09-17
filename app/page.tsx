@@ -79,14 +79,14 @@ type Aba =
 /* ================================================= */
 
 const TEMAS_ENXOVAL = [
-"Cozinha",
-"Mesa",
-"Quarto",
-"Banheiro",
-"Limpeza",
-"Sala",
-"Decoração",
-"Outros",
+  "🍳 Cozinha",
+  "🍽️ Mesa",
+  "🛏️ Quarto",
+  "🛁 Banheiro",
+  "🧹 Limpeza",
+  "🛋️ Sala",
+  "🪴 Decoração",
+  "📦 Outros",
 ];
 
 /* ================================================= */
