@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 /* ================================================= */
@@ -34,6 +34,7 @@ observacao: string | null;
 created_at?: string;
 preco_estimado?: number | null;
 preco_pago?: number | null;
+imagem_url?: string | null;
 };
 
 type PlanejamentoMensal = {
@@ -319,6 +320,9 @@ observacaoItem,
 setObservacaoItem,
 ] = useState("");
 
+const [imagemItem, setImagemItem] = useState("");
+const [uploadandoImagemItem, setUploadandoImagemItem] = useState(false);
+
 const [
 salvandoItem,
 setSalvandoItem,
@@ -361,6 +365,9 @@ observacaoItemEdicao,
 setObservacaoItemEdicao,
 ] = useState("");
 
+const [imagemItemEdicao, setImagemItemEdicao] = useState("");
+const [uploadandoImagemItemEdicao, setUploadandoImagemItemEdicao] = useState(false);
+
 const [
 compradoItemEdicao,
 setCompradoItemEdicao,
@@ -370,6 +377,8 @@ const [
 salvandoEdicaoItem,
 setSalvandoEdicaoItem,
 ] = useState(false);
+
+const [temasEnxovalAbertos, setTemasEnxovalAbertos] = useState<string[]>([]);
 
 /* EXCLUIR ITEM */
 
@@ -1046,6 +1055,65 @@ await buscarDados();
 }
 
 /* ================================================= */
+/* UPLOAD DE IMAGEM DO ENXOVAL */
+/* ================================================= */
+
+async function enviarImagemItem(
+  evento: ChangeEvent<HTMLInputElement>,
+  modo: "novo" | "edicao"
+) {
+  const arquivo = evento.target.files?.[0];
+  evento.target.value = "";
+
+  if (!arquivo) return;
+
+  if (!arquivo.type.startsWith("image/")) {
+    setErro("Escolha uma imagem válida.");
+    return;
+  }
+
+  if (arquivo.size > 5 * 1024 * 1024) {
+    setErro("A imagem deve ter no máximo 5 MB.");
+    return;
+  }
+
+  setErro("");
+  if (modo === "novo") setUploadandoImagemItem(true);
+  else setUploadandoImagemItemEdicao(true);
+
+  try {
+    const extensao = arquivo.name.split(".").pop()?.toLowerCase() || "jpg";
+    const nomeArquivo = `${crypto.randomUUID()}.${extensao}`;
+    const caminho = `itens/${nomeArquivo}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("enxoval-imagens")
+      .upload(caminho, arquivo, {
+        upsert: false,
+        contentType: arquivo.type,
+        cacheControl: "3600",
+      });
+
+    if (uploadError) {
+      setErro(
+        `Não foi possível enviar a imagem. Verifique se o bucket \"enxoval-imagens\" foi criado no Supabase. ${uploadError.message}`
+      );
+      return;
+    }
+
+    const { data } = supabase.storage
+      .from("enxoval-imagens")
+      .getPublicUrl(caminho);
+
+    if (modo === "novo") setImagemItem(data.publicUrl);
+    else setImagemItemEdicao(data.publicUrl);
+  } finally {
+    if (modo === "novo") setUploadandoImagemItem(false);
+    else setUploadandoImagemItemEdicao(false);
+  }
+}
+
+/* ================================================= */
 /* ADICIONAR ITEM */
 /* ================================================= */
 
@@ -1109,6 +1177,11 @@ const { error } = await supabase
 
     observacao:
       observacaoItem || null,
+
+    imagem_url:
+      tipoNovoItem === "Enxoval"
+        ? imagemItem.trim() || null
+        : null,
   });
 
 if (error) {
@@ -1125,6 +1198,7 @@ setValorItem("");
 setQuantidadeItem("1");
 setLojaItem("");
 setObservacaoItem("");
+setImagemItem("");
 
 setModalItem(false);
 
@@ -1179,6 +1253,8 @@ setLojaItemEdicao(
 setObservacaoItemEdicao(
   item.observacao || ""
 );
+
+setImagemItemEdicao(item.imagem_url || "");
 
 setCompradoItemEdicao(
   item.comprado || false
@@ -1252,6 +1328,12 @@ const { error } = await supabase
     observacao:
       observacaoItemEdicao ||
       null,
+
+    imagem_url:
+      itemEditando.categoria ===
+      "Enxoval"
+        ? imagemItemEdicao.trim() || null
+        : null,
 
     comprado:
       compradoItemEdicao,
@@ -3242,187 +3324,157 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
         {abaAtiva ===
           "enxoval" && (
           <>
-
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-6 sm:mb-8">
-
               <div>
-
                 <p className="text-slate-500">
-                  Preparativos para a
-                  mudança
+                  Preparativos para a mudança
                 </p>
-
                 <h2 className="text-3xl md:text-4xl font-bold mt-2">
                   🧺 Nosso enxoval
                 </h2>
-
                 <p className="text-slate-500 mt-2">
-                  Organizado por temas
-                  para facilitar nosso
-                  planejamento.
+                  Organizado por temas, como uma planilha, para facilitar nosso planejamento.
                 </p>
-
               </div>
 
               <button
                 onClick={() => {
-                  setTipoNovoItem(
-                    "Enxoval"
-                  );
-
-                  setTemaItem(
-                    "Cozinha"
-                  );
-
-                  setModalItem(
-                    true
-                  );
+                  setTipoNovoItem("Enxoval");
+                  setTemaItem("Cozinha");
+                  setImagemItem("");
+                  setModalItem(true);
                 }}
                 className="w-full sm:w-auto bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-2xl"
               >
                 + Adicionar item
               </button>
-
             </div>
 
             <div className="bg-white border border-pink-100 rounded-2xl sm:rounded-3xl p-5 sm:p-6 mb-6 sm:mb-8 shadow-sm">
-
-              <p className="text-slate-500">
-                💰 Valor estimado total
-                do enxoval
-              </p>
-
-              <h3 className="text-2xl sm:text-3xl font-bold text-pink-500 mt-2 break-words">
-                {formatarMoeda(
-                  totalEnxoval
-                )}
-              </h3>
-
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <p className="text-slate-500">💰 Valor estimado total do enxoval</p>
+                  <h3 className="text-2xl sm:text-3xl font-bold text-pink-500 mt-2 break-words">
+                    {formatarMoeda(totalEnxoval)}
+                  </h3>
+                </div>
+                <div className="text-sm text-slate-500">
+                  <strong className="text-slate-700">{itensEnxoval.length}</strong> item(ns) •{" "}
+                  <strong className="text-blue-600">
+                    {itensEnxoval.filter((item) => item.comprado).length}
+                  </strong>{" "}
+                  comprado(s) •{" "}
+                  <strong className="text-slate-700">
+                    {itensEnxoval.filter((item) => !item.comprado).length}
+                  </strong>{" "}
+                  faltando
+                </div>
+              </div>
             </div>
 
-            {TEMAS_ENXOVAL.map(
-              (tema) => {
-                const itensDoTema =
-                  itensEnxoval.filter(
-                    (item) =>
-                      (item.tema ||
-                        "Outros") ===
-                      tema
-                  );
+            <div className="space-y-4">
+              {TEMAS_ENXOVAL.map((tema) => {
+                const itensDoTema = itensEnxoval.filter(
+                  (item) => (item.tema || "Outros") === tema
+                );
 
-                if (
-                  itensDoTema.length ===
+                if (itensDoTema.length === 0) return null;
+
+                const totalTema = itensDoTema.reduce(
+                  (acumulado, item) => acumulado + valorDoItem(item),
                   0
-                ) {
-                  return null;
-                }
+                );
 
-                const totalTema =
-                  itensDoTema.reduce(
-                    (
-                      acumulado,
-                      item
-                    ) =>
-                      acumulado +
-                      valorDoItem(
-                        item
-                      ),
-                    0
-                  );
+                const compradosTema = itensDoTema.filter(
+                  (item) => item.comprado
+                ).length;
+
+                const aberto = temasEnxovalAbertos.includes(tema);
 
                 return (
                   <section
                     key={tema}
-                    className="mb-8 sm:mb-10"
+                    className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden"
                   >
-
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3">
-
-                      <div>
-
-                        <h3 className="text-xl sm:text-2xl font-bold">
-                          🧺 {tema}
-                        </h3>
-
-                        <p className="text-slate-500 text-sm mt-1">
-                          {
-                            itensDoTema.length
-                          }{" "}
-                          item(ns)
-                        </p>
-
-                      </div>
-
-                      <strong className="text-pink-500 text-lg sm:text-xl">
-                        {formatarMoeda(
-                          totalTema
-                        )}
-                      </strong>
-
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
-
-                      {itensDoTema.map(
-                        (item) => (
-                          <CardItem
-                            key={
-                              item.id
-                            }
-                            item={
-                              item
-                            }
-                            formatarMoeda={
-                              formatarMoeda
-                            }
-                            editar={
-                              abrirEdicaoItem
-                            }
-                            excluir={
-                              setItemParaExcluir
-                            }
-                          />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTemasEnxovalAbertos((atuais) =>
+                          atuais.includes(tema)
+                            ? atuais.filter((item) => item !== tema)
+                            : [...atuais, tema]
                         )
-                      )}
+                      }
+                      className="w-full text-left p-5 sm:p-6 hover:bg-slate-50 transition"
+                      aria-expanded={aberto}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 shrink-0 rounded-2xl bg-pink-50 flex items-center justify-center text-2xl">
+                          🧺
+                        </div>
 
-                    </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <h3 className="text-xl sm:text-2xl font-bold text-slate-800">
+                              {tema}
+                            </h3>
+                            <strong className="text-pink-500 text-lg">
+                              {formatarMoeda(totalTema)}
+                            </strong>
+                          </div>
 
+                          <p className="text-slate-500 text-sm mt-1">
+                            {itensDoTema.length} item(ns) •{" "}
+                            <span className="text-blue-600 font-medium">
+                              {compradosTema} comprado(s)
+                            </span>{" "}
+                            • {itensDoTema.length - compradosTema} faltando
+                          </p>
+                        </div>
+
+                        <span
+                          className={`shrink-0 w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 transition-transform ${
+                            aberto ? "rotate-180" : ""
+                          }`}
+                        >
+                          ↓
+                        </span>
+                      </div>
+                    </button>
+
+                    {aberto && (
+                      <div className="border-t border-slate-100 p-4 sm:p-6 bg-slate-50/50">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+                          {itensDoTema.map((item) => (
+                            <CardItem
+                              key={item.id}
+                              item={item}
+                              formatarMoeda={formatarMoeda}
+                              editar={abrirEdicaoItem}
+                              excluir={setItemParaExcluir}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </section>
                 );
-              }
-            )}
+              })}
+            </div>
 
-            {itensEnxoval.length ===
-              0 && (
+            {itensEnxoval.length === 0 && (
               <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-8 sm:p-10 text-center">
-
-                <div className="text-6xl">
-                  🧺
-                </div>
-
+                <div className="text-6xl">🧺</div>
                 <h3 className="text-xl font-bold mt-4">
-                  Comecem a montar o
-                  enxoval!
+                  Comecem a montar o enxoval!
                 </h3>
-
                 <p className="text-slate-500 mt-2">
-                  Organize os itens por
-                  cozinha, quarto,
-                  banheiro, limpeza e
-                  muito mais.
+                  Organize os itens por cozinha, quarto, banheiro, limpeza e muito mais.
                 </p>
-
               </div>
             )}
-
           </>
         )}
-
-      </div>
-
-    </div>
-
-  </div>
 
   {/* MODAL NOSSA AGENDA */}
 
@@ -3804,6 +3856,42 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
           setValue={setLojaItem}
         />
 
+        {tipoNovoItem === "Enxoval" && (
+          <div className="mb-5">
+            <label className="block font-medium mb-2">Imagem do item</label>
+            <label className={`w-full flex items-center justify-center gap-3 border-2 border-dashed rounded-2xl p-5 cursor-pointer transition ${uploadandoImagemItem ? "opacity-60 cursor-wait" : "border-pink-200 hover:border-pink-400 hover:bg-pink-50"}`}>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadandoImagemItem}
+                onChange={(e) => enviarImagemItem(e, "novo")}
+              />
+              <span className="text-2xl">📷</span>
+              <span className="font-semibold text-slate-700">
+                {uploadandoImagemItem ? "Enviando imagem..." : imagemItem ? "Trocar imagem" : "Adicionar imagem"}
+              </span>
+            </label>
+
+            {imagemItem && (
+              <div className="mt-3 relative rounded-2xl border border-slate-200 bg-slate-50 p-2 overflow-hidden">
+                <img
+                  src={imagemItem}
+                  alt={`Prévia de ${nomeItem || "item"}`}
+                  className="w-full h-48 object-contain rounded-xl bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setImagemItem("")}
+                  className="absolute top-4 right-4 bg-white/95 hover:bg-red-50 text-red-600 px-3 py-2 rounded-xl shadow-sm text-sm font-semibold"
+                >
+                  Remover
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <textarea
           value={
             observacaoItem
@@ -3927,6 +4015,42 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
             setLojaItemEdicao
           }
         />
+
+        {itemEditando.categoria === "Enxoval" && (
+          <div className="mb-5">
+            <label className="block font-medium mb-2">Imagem do item</label>
+            <label className={`w-full flex items-center justify-center gap-3 border-2 border-dashed rounded-2xl p-5 cursor-pointer transition ${uploadandoImagemItemEdicao ? "opacity-60 cursor-wait" : "border-pink-200 hover:border-pink-400 hover:bg-pink-50"}`}>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadandoImagemItemEdicao}
+                onChange={(e) => enviarImagemItem(e, "edicao")}
+              />
+              <span className="text-2xl">📷</span>
+              <span className="font-semibold text-slate-700">
+                {uploadandoImagemItemEdicao ? "Enviando imagem..." : imagemItemEdicao ? "Trocar imagem" : "Adicionar imagem"}
+              </span>
+            </label>
+
+            {imagemItemEdicao && (
+              <div className="mt-3 relative rounded-2xl border border-slate-200 bg-slate-50 p-2 overflow-hidden">
+                <img
+                  src={imagemItemEdicao}
+                  alt={`Prévia de ${nomeItemEdicao || "item"}`}
+                  className="w-full h-48 object-contain rounded-xl bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setImagemItemEdicao("")}
+                  className="absolute top-4 right-4 bg-white/95 hover:bg-red-50 text-red-600 px-3 py-2 rounded-xl shadow-sm text-sm font-semibold"
+                >
+                  Remover
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         <label className="flex items-center gap-3 mb-5 p-4 bg-slate-50 rounded-xl">
 
@@ -4382,137 +4506,161 @@ className={`min-w-0 bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-6 border shadow
 }
 
 /* ================================================= */
+/* LINKS CLICÁVEIS NA DESCRIÇÃO */
+/* ================================================= */
+
+function renderizarTextoComLinks(texto: string) {
+  const partes = texto.split(/(https?:\/\/[^\s]+)/g);
+
+  return partes.map((parte, index) => {
+    if (/^https?:\/\//i.test(parte)) {
+      const urlLimpa = parte.replace(/[),.;!?]+$/, "");
+      const final = parte.slice(urlLimpa.length);
+
+      return (
+        <span key={`${urlLimpa}-${index}`}>
+          <a
+            href={urlLimpa}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-800 underline font-medium"
+          >
+            {urlLimpa}
+          </a>
+          {final}
+        </span>
+      );
+    }
+
+    return <span key={index}>{parte}</span>;
+  });
+}
+
+/* ================================================= */
 /* CARD ITEM RESPONSIVO */
 /* ================================================= */
 
 function CardItem({
-item,
-formatarMoeda,
-editar,
-excluir,
+  item,
+  formatarMoeda,
+  editar,
+  excluir,
 }: {
-item: ItemCasa;
-formatarMoeda: (
-valor: number
-) => string;
-editar: (
-item: ItemCasa
-) => void;
-excluir: (
-item: ItemCasa
-) => void;
+  item: ItemCasa;
+  formatarMoeda: (valor: number) => string;
+  editar: (item: ItemCasa) => void;
+  excluir: (item: ItemCasa) => void;
 }) {
-const valorUnitario =
-Number(
-item.preco_estimado ??
-item.valor_estimado ??
-0
-);
+  const valorUnitario = Number(
+    item.preco_estimado ??
+    item.valor_estimado ??
+    0
+  );
 
-const quantidade =
-Number(
-item.quantidade || 1
-);
+  const quantidade = Number(item.quantidade || 1);
+  const valorTotal = valorUnitario * quantidade;
 
-const valorTotal =
-valorUnitario *
-quantidade;
-
-return (
-<div
-className={`min-w-0 bg-white border rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-sm transition hover:shadow-md ${
+  return (
+    <div
+      className={`min-w-0 bg-white border rounded-2xl sm:rounded-3xl overflow-hidden shadow-sm transition hover:shadow-md ${
         item.comprado
           ? "border-blue-200"
           : "border-slate-200"
       }`}
->
-
-  <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
-
-    <div className="min-w-0">
-
-      <h3
-        className={`text-lg sm:text-xl font-bold break-words ${
-          item.comprado
-            ? "line-through text-slate-400"
-            : "text-slate-800"
-        }`}
-      >
-        {item.comprado
-          ? "✅"
-          : item.categoria ===
-            "Enxoval"
-          ? "🧺"
-          : "🏠"}{" "}
-        {item.nome}
-      </h3>
-
-      {item.tema && (
-        <p className="text-sm text-pink-500 font-medium mt-2 break-words">
-          🏷️ {item.tema}
-        </p>
+    >
+      {item.imagem_url && (
+        <div className="h-48 sm:h-52 bg-slate-50 border-b border-slate-100">
+          <img
+            src={item.imagem_url}
+            alt={item.nome}
+            className={`w-full h-full object-contain ${
+              item.comprado ? "opacity-60" : ""
+            }`}
+          />
+        </div>
       )}
 
-      {item.loja && (
-        <p className="text-sm text-slate-500 mt-2 break-words">
-          🏪 {item.loja}
-        </p>
-      )}
+      <div className="p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <span
+                className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-bold ${
+                  item.comprado
+                    ? "bg-blue-50 text-blue-600"
+                    : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                {item.comprado
+                  ? "🟢 Comprado"
+                  : "⚪ Não comprado"}
+              </span>
+            </div>
 
-      <p className="text-sm text-slate-500 mt-3">
-        Quantidade:{" "}
-        <strong>
-          {quantidade}
-        </strong>
-      </p>
+            <h3
+              className={`text-lg sm:text-xl font-bold break-words ${
+                item.comprado
+                  ? "line-through text-slate-400"
+                  : "text-slate-800"
+              }`}
+            >
+              {item.categoria === "Enxoval" ? "🧺" : "🏠"}{" "}
+              {item.nome}
+            </h3>
 
-      <p className="text-blue-600 font-bold text-lg sm:text-xl mt-2 break-words">
-        {formatarMoeda(
-          valorTotal
+            {item.tema && (
+              <p className="text-sm text-pink-500 font-medium mt-2 break-words">
+                🏷️ {item.tema}
+              </p>
+            )}
+
+            {item.loja && (
+              <p className="text-sm text-slate-500 mt-2 break-words">
+                🏪 {item.loja}
+              </p>
+            )}
+
+            <p className="text-sm text-slate-500 mt-3">
+              Quantidade: <strong>{quantidade}</strong>
+            </p>
+
+            <p className="text-blue-600 font-bold text-lg sm:text-xl mt-2 break-words">
+              {formatarMoeda(valorTotal)}
+            </p>
+
+            {quantidade > 1 && (
+              <p className="text-xs text-slate-400 mt-1">
+                {formatarMoeda(valorUnitario)} por unidade
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-2 h-fit shrink-0">
+            <button
+              onClick={() => editar(item)}
+              className="w-11 h-11 shrink-0 bg-blue-50 hover:bg-blue-100 rounded-xl"
+              aria-label={`Editar ${item.nome}`}
+            >
+              ✏️
+            </button>
+
+            <button
+              onClick={() => excluir(item)}
+              className="w-11 h-11 shrink-0 bg-red-500 hover:bg-red-600 text-white rounded-xl"
+              aria-label={`Excluir ${item.nome}`}
+            >
+              🗑️
+            </button>
+          </div>
+        </div>
+
+        {item.observacao && (
+          <div className="text-sm text-slate-500 mt-4 pt-4 border-t border-slate-100 break-words">
+            <span className="font-medium">📝 </span>
+            {renderizarTextoComLinks(item.observacao)}
+          </div>
         )}
-      </p>
-
-      {quantidade > 1 && (
-        <p className="text-xs text-slate-400 mt-1">
-          {formatarMoeda(
-            valorUnitario
-          )} por unidade
-        </p>
-      )}
-
+      </div>
     </div>
-
-    <div className="flex gap-2 h-fit shrink-0">
-
-      <button
-        onClick={() =>
-          editar(item)
-        }
-        className="w-11 h-11 shrink-0 bg-blue-50 hover:bg-blue-100 rounded-xl"
-      >
-        ✏️
-      </button>
-
-      <button
-        onClick={() =>
-          excluir(item)
-        }
-        className="w-11 h-11 shrink-0 bg-red-500 hover:bg-red-600 text-white rounded-xl"
-      >
-        🗑️
-      </button>
-
-    </div>
-
-  </div>
-
-  {item.observacao && (
-    <p className="text-sm text-slate-500 mt-4 pt-4 border-t border-slate-100 break-words">
-      📝 {item.observacao}
-    </p>
-  )}
-
-</div>
-
-);
+  );
 }
