@@ -392,7 +392,7 @@ salvandoEdicaoItem,
 setSalvandoEdicaoItem,
 ] = useState(false);
 
-const [temasEnxovalAbertos, setTemasEnxovalAbertos] = useState<string[]>([]);
+const [temaEnxovalSelecionado, setTemaEnxovalSelecionado] = useState<string | null>(null);
 
 /* EXCLUIR ITEM */
 
@@ -3386,78 +3386,73 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
               </div>
             </div>
 
-            <div className="space-y-4">
-              {TEMAS_ENXOVAL.map((tema) => {
+            {temaEnxovalSelecionado ? (
+              (() => {
+                const tema = temaEnxovalSelecionado;
                 const itensDoTema = itensEnxoval.filter(
                   (item) => (item.tema || "Outros") === tema
                 );
-
-                if (itensDoTema.length === 0) return null;
-
                 const totalTema = itensDoTema.reduce(
                   (acumulado, item) => acumulado + valorDoItem(item),
                   0
                 );
-
                 const compradosTema = itensDoTema.filter(
                   (item) => item.comprado
                 ).length;
 
-                const aberto = temasEnxovalAbertos.includes(tema);
-
                 return (
-                  <section
-                    key={tema}
-                    className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden"
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setTemasEnxovalAbertos((atuais) =>
-                          atuais.includes(tema)
-                            ? atuais.filter((item) => item !== tema)
-                            : [...atuais, tema]
-                        )
-                      }
-                      className="w-full text-left p-5 sm:p-6 hover:bg-slate-50 transition"
-                      aria-expanded={aberto}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 shrink-0 rounded-2xl bg-pink-50 flex items-center justify-center text-2xl">
-                          {EMOJIS_TEMAS_ENXOVAL[tema] || "📦"}
-                        </div>
+                  <section className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
+                    <div className="p-4 sm:p-6 border-b border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setTemaEnxovalSelecionado(null)}
+                        className="inline-flex items-center gap-2 text-slate-600 hover:text-pink-500 font-medium mb-5 transition"
+                      >
+                        <span className="text-xl">←</span>
+                        Voltar para categorias
+                      </button>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <h3 className="text-xl sm:text-2xl font-bold text-slate-800">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="w-14 h-14 shrink-0 rounded-2xl bg-pink-50 flex items-center justify-center text-3xl">
+                            {EMOJIS_TEMAS_ENXOVAL[tema] || "📦"}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="text-2xl sm:text-3xl font-bold text-slate-800">
                               {formatarTemaEnxoval(tema)}
                             </h3>
-                            <strong className="text-pink-500 text-lg">
-                              {formatarMoeda(totalTema)}
-                            </strong>
+                            <p className="text-slate-500 text-sm mt-1">
+                              {itensDoTema.length} item(ns) • {""}
+                              <span className="text-blue-600 font-medium">
+                                {compradosTema} comprado(s)
+                              </span>{" "}
+                              • {itensDoTema.length - compradosTema} faltando
+                            </p>
                           </div>
-
-                          <p className="text-slate-500 text-sm mt-1">
-                            {itensDoTema.length} item(ns) •{" "}
-                            <span className="text-blue-600 font-medium">
-                              {compradosTema} comprado(s)
-                            </span>{" "}
-                            • {itensDoTema.length - compradosTema} faltando
-                          </p>
                         </div>
 
-                        <span
-                          className={`shrink-0 w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 transition-transform ${
-                            aberto ? "rotate-180" : ""
-                          }`}
-                        >
-                          ↓
-                        </span>
+                        <div className="flex items-center justify-between sm:justify-end gap-4">
+                          <strong className="text-pink-500 text-lg">
+                            {formatarMoeda(totalTema)}
+                          </strong>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTipoNovoItem("Enxoval");
+                              setTemaItem(tema);
+                              setImagemItem("");
+                              setModalItem(true);
+                            }}
+                            className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-2.5 rounded-xl font-medium transition"
+                          >
+                            + Adicionar
+                          </button>
+                        </div>
                       </div>
-                    </button>
+                    </div>
 
-                    {aberto && (
-                      <div className="border-t border-slate-100 p-4 sm:p-6 bg-slate-50/50">
+                    <div className="p-4 sm:p-6 bg-slate-50/50">
+                      {itensDoTema.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
                           {itensDoTema.map((item) => (
                             <CardItem
@@ -3469,12 +3464,72 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                             />
                           ))}
                         </div>
-                      </div>
-                    )}
+                      ) : (
+                        <div className="py-12 text-center">
+                          <div className="text-5xl">{EMOJIS_TEMAS_ENXOVAL[tema] || "📦"}</div>
+                          <h4 className="text-lg font-bold text-slate-800 mt-4">
+                            Nenhum item nesta categoria
+                          </h4>
+                          <p className="text-slate-500 mt-1">
+                            Adicione o primeiro item para começar a montar esta categoria.
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </section>
                 );
-              })}
-            </div>
+              })()
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {TEMAS_ENXOVAL.map((tema) => {
+                  const itensDoTema = itensEnxoval.filter(
+                    (item) => (item.tema || "Outros") === tema
+                  );
+                  const totalTema = itensDoTema.reduce(
+                    (acumulado, item) => acumulado + valorDoItem(item),
+                    0
+                  );
+                  const compradosTema = itensDoTema.filter(
+                    (item) => item.comprado
+                  ).length;
+
+                  return (
+                    <button
+                      key={tema}
+                      type="button"
+                      onClick={() => setTemaEnxovalSelecionado(tema)}
+                      className="group w-full text-left bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-sm hover:border-pink-200 hover:shadow-md transition"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 shrink-0 rounded-2xl bg-pink-50 flex items-center justify-center text-3xl group-hover:scale-105 transition-transform">
+                          {EMOJIS_TEMAS_ENXOVAL[tema] || "📦"}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-3">
+                            <h3 className="text-lg sm:text-xl font-bold text-slate-800">
+                              {formatarTemaEnxoval(tema)}
+                            </h3>
+                            <span className="text-slate-400 group-hover:text-pink-500 text-2xl transition">
+                              →
+                            </span>
+                          </div>
+                          <p className="text-slate-500 text-sm mt-1">
+                            {itensDoTema.length} item(ns) • {""}
+                            <span className="text-blue-600 font-medium">
+                              {compradosTema} comprado(s)
+                            </span>{" "}
+                            • {itensDoTema.length - compradosTema} faltando
+                          </p>
+                          <p className="text-pink-500 font-semibold mt-2">
+                            {formatarMoeda(totalTema)}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {itensEnxoval.length === 0 && (
               <div className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-8 sm:p-10 text-center">
