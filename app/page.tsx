@@ -79,15 +79,29 @@ type Aba =
 /* ================================================= */
 
 const TEMAS_ENXOVAL = [
-  "🍳 Cozinha",
-  "🍽️ Mesa",
-  "🛏️ Quarto",
-  "🛁 Banheiro",
-  "🧹 Limpeza",
-  "🛋️ Sala",
-  "🪴 Decoração",
-  "📦 Outros",
+  "Cozinha",
+  "Mesa",
+  "Quarto",
+  "Banheiro",
+  "Limpeza",
+  "Sala",
+  "Decoração",
+  "Outros",
 ];
+
+const EMOJIS_TEMAS_ENXOVAL: Record<string, string> = {
+  Cozinha: "🍳",
+  Mesa: "🍽️",
+  Quarto: "🛏️",
+  Banheiro: "🛁",
+  Limpeza: "🧹",
+  Sala: "🛋️",
+  Decoração: "🪴",
+  Outros: "📦",
+};
+
+const formatarTemaEnxoval = (tema: string) =>
+  `${EMOJIS_TEMAS_ENXOVAL[tema] || "📦"} ${tema}`;
 
 /* ================================================= */
 /* COMPONENTE PRINCIPAL */
@@ -3410,13 +3424,13 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 shrink-0 rounded-2xl bg-pink-50 flex items-center justify-center text-2xl">
-                          🧺
+                          {EMOJIS_TEMAS_ENXOVAL[tema] || "📦"}
                         </div>
 
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                             <h3 className="text-xl sm:text-2xl font-bold text-slate-800">
-                              {tema}
+                              {formatarTemaEnxoval(tema)}
                             </h3>
                             <strong className="text-pink-500 text-lg">
                               {formatarMoeda(totalTema)}
@@ -3824,7 +3838,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                     key={tema}
                     value={tema}
                   >
-                    {tema}
+                    {formatarTemaEnxoval(tema)}
                   </option>
                 )
               )}
@@ -3974,7 +3988,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                     key={tema}
                     value={tema}
                   >
-                    {tema}
+                    {formatarTemaEnxoval(tema)}
                   </option>
                 )
               )}
