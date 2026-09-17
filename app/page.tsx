@@ -3077,20 +3077,20 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <div className="min-w-[760px] p-3 sm:p-5">
-                  <div className="grid grid-cols-7 gap-2 mb-2">
+              <div className="w-full overflow-hidden">
+                <div className="w-full p-2 sm:p-5">
+                  <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-1 sm:mb-2">
                     {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((diaSemana) => (
                       <div
                         key={diaSemana}
-                        className="text-center text-xs sm:text-sm font-semibold text-slate-500 py-2"
+                        className="min-w-0 text-center text-[10px] sm:text-sm font-semibold text-slate-500 py-1.5 sm:py-2"
                       >
                         {diaSemana}
                       </div>
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-7 gap-2">
+                  <div className="grid grid-cols-7 gap-1 sm:gap-2">
                     {Array.from(
                       {
                         length: new Date(anoAgenda, mesAgenda, 1).getDay(),
@@ -3098,7 +3098,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                       (_, index) => (
                         <div
                           key={`vazio-${index}`}
-                          className="min-h-[112px] rounded-2xl bg-slate-50/60 border border-transparent"
+                          className="min-w-0 min-h-[76px] sm:min-h-[112px] rounded-xl sm:rounded-2xl bg-slate-50/60 border border-transparent"
                         />
                       )
                     )}
@@ -3135,15 +3135,15 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                                 );
                               }
                             }}
-                            className={`min-h-[112px] cursor-pointer text-left rounded-2xl border p-2 sm:p-3 transition hover:shadow-sm hover:border-pink-200 ${
+                            className={`min-w-0 min-h-[76px] sm:min-h-[112px] cursor-pointer text-left rounded-xl sm:rounded-2xl border p-1.5 sm:p-3 transition hover:shadow-sm hover:border-pink-200 ${
                               hojeCalendario
                                 ? "border-pink-300 bg-pink-50/40"
                                 : "border-slate-200 bg-white"
                             }`}
                           >
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center justify-between gap-1 min-w-0">
                               <span
-                                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                className={`w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold ${
                                   hojeCalendario
                                     ? "bg-pink-500 text-white"
                                     : "text-slate-700"
@@ -3152,18 +3152,18 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                                 {dia}
                               </span>
                               {eventos.length > 0 && (
-                                <span className="text-[10px] text-pink-500 font-semibold">
-                                  {eventos.length} evento(s)
+                                <span className="min-w-0 truncate text-[8px] sm:text-[10px] text-pink-500 font-semibold">
+                                  {eventos.length} {eventos.length === 1 ? "evento" : "eventos"}
                                 </span>
                               )}
                             </div>
 
-                            <div className="space-y-1 mt-2">
+                            <div className="space-y-1 mt-1.5 sm:mt-2 min-w-0">
                               {eventos.slice(0, 3).map((evento) => (
                                 <div
                                   key={evento.id}
                                   onClick={(e) => e.stopPropagation()}
-                                  className={`rounded-lg px-2 py-1.5 border ${
+                                  className={`min-w-0 rounded-md sm:rounded-lg px-1 sm:px-2 py-1 sm:py-1.5 border ${
                                     evento.concluido
                                       ? "bg-slate-50 border-slate-200"
                                       : "bg-pink-50 border-pink-100"
@@ -3175,7 +3175,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                                     className="w-full text-left"
                                   >
                                     <p
-                                      className={`text-xs font-semibold break-words ${
+                                      className={`text-[9px] sm:text-xs leading-tight font-semibold break-words ${
                                         evento.concluido
                                           ? "line-through text-slate-400"
                                           : "text-slate-700"
@@ -3185,7 +3185,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                                       {evento.titulo}
                                     </p>
                                     {evento.horario && (
-                                      <p className="text-[10px] text-slate-500 mt-0.5">
+                                      <p className="text-[8px] sm:text-[10px] text-slate-500 mt-0.5 truncate">
                                         {evento.horario}
                                       </p>
                                     )}
