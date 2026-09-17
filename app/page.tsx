@@ -2866,160 +2866,337 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
           </>
         )}
 
-        {/* NOSSA AGENDA */}
+       /* ================================================= */
+/* NOSSA AGENDA */
+/* ================================================= */
 
-        {abaAtiva ===
-          "agenda" && (
-          <>
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-6 sm:mb-8">
-              <div className="min-w-0">
-                <p className="text-pink-500 font-semibold">
-                  Momentos, compromissos e datas especiais
-                </p>
-                <h2 className="text-3xl md:text-4xl font-bold mt-2 break-words">
-                  ❤️ Nossa Agenda
-                </h2>
-                <p className="text-slate-500 mt-2 max-w-2xl">
-                  Organizem o que vocês querem fazer juntos e as datas importantes que não podem esquecer.
-                </p>
-              </div>
+function dataLocalString(dataBase = new Date()) {
+  const ano = dataBase.getFullYear();
+  const mes = String(dataBase.getMonth() + 1).padStart(2, "0");
+  const dia = String(dataBase.getDate()).padStart(2, "0");
 
-              <button
-                type="button"
-                onClick={() => abrirNovoEvento()}
-                className="w-full sm:w-auto shrink-0 bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-2xl font-semibold shadow-sm"
-              >
-                + Adicionar programação
-              </button>
-            </div>
+  return `${ano}-${mes}-${dia}`;
+}
 
-            <section className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-widest text-pink-500 font-bold">
-                    Calendário
-                  </p>
-                  <h3 className="text-2xl font-bold mt-1">
-                    {nomeDoMes(mesAgenda + 1)} {anoAgenda}
-                  </h3>
-                </div>
+function abrirNovoEvento(
+  dataSelecionada = dataLocalString()
+) {
+  setEventoEditando(null);
+  setTituloEvento("");
+  setDataEvento(dataSelecionada);
+  setHorarioEvento("");
+  setCategoriaEvento("Fazer juntos");
+  setDescricaoEvento("");
+  setRecorrenciaEvento("nenhuma");
+  setErro("");
+  setModalAgenda(true);
+}
 
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => mudarMesAgenda(-1)} className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50">
-                    ←
-                  </button>
-                  <button type="button" onClick={() => { setMesAgenda(new Date().getMonth()); setAnoAgenda(new Date().getFullYear()); }} className="px-4 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-medium">
-                    Hoje
-                  </button>
-                  <button type="button" onClick={() => mudarMesAgenda(1)} className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50">
-                    →
-                  </button>
-                </div>
-              </div>
+function abrirEdicaoEvento(evento: EventoAgenda) {
+  setEventoEditando(evento);
+  setTituloEvento(evento.titulo);
+  setDataEvento(evento.data);
+  setHorarioEvento(evento.horario || "");
+  setCategoriaEvento(evento.categoria || "Fazer juntos");
+  setDescricaoEvento(evento.descricao || "");
+  setRecorrenciaEvento(evento.recorrencia || "nenhuma");
+  setErro("");
+  setModalAgenda(true);
+}
 
-              <div className="p-3 sm:p-5 overflow-x-auto">
-                <div className="min-w-[620px]">
-                  <div className="grid grid-cols-7 mb-2">
-                    {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((dia) => (
-                      <div key={dia} className="text-center text-xs sm:text-sm font-bold text-slate-400 py-2">
-                        {dia}
-                      </div>
-                    ))}
-                  </div>
+async function salvarEventoAgenda(evento: FormEvent) {
+  evento.preventDefault();
+  setErro("");
 
-                  <div className="grid grid-cols-7 border-l border-t border-slate-200 rounded-xl overflow-hidden">
-                    {Array.from({ length: new Date(anoAgenda, mesAgenda, 1).getDay() + new Date(anoAgenda, mesAgenda + 1, 0).getDate() }).map((_, indice) => {
-                      const primeiroDia = new Date(anoAgenda, mesAgenda, 1).getDay();
-                      const dia = indice - primeiroDia + 1;
-                      const valido = dia >= 1;
-                      const eventos = valido ? eventosDoDia(dia) : [];
-                      const hojeAgora = new Date();
-                      const ehHoje = valido &&
-                        hojeAgora.getDate() === dia &&
-                        hojeAgora.getMonth() === mesAgenda &&
-                        hojeAgora.getFullYear() === anoAgenda;
+  if (!tituloEvento.trim()) {
+    setErro("Digite o título da programação.");
+    return;
+  }
 
-                      return (
-                        <button
-                          type="button"
-                          key={indice}
-                          disabled={!valido}
-                          onClick={() => valido && abrirNovoEvento(`${anoAgenda}-${String(mesAgenda + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`)}
-                          className={`min-h-[92px] sm:min-h-[112px] text-left align-top p-2 border-r border-b border-slate-200 transition ${valido ? "bg-white hover:bg-pink-50/40" : "bg-slate-50"}`}
-                        >
-                          {valido && (
-                            <>
-                              <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${ehHoje ? "bg-pink-500 text-white" : "text-slate-600"}`}>
-                                {dia}
-                              </span>
+  if (!dataEvento) {
+    setErro("Escolha uma data.");
+    return;
+  }
 
-                              <div className="mt-1 space-y-1">
-                                {eventos.slice(0, 3).map((evento) => (
-                                  <span
-                                    key={evento.id}
-                                    onClick={(e) => { e.stopPropagation(); abrirEdicaoEvento(evento); }}
-                                    className={`block rounded-lg px-2 py-1 text-[11px] leading-tight font-medium truncate ${evento.concluido ? "bg-slate-100 text-slate-400 line-through" : evento.categoria === "Data importante" ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"}`}
-                                  >
-                                    {evento.horario ? `${evento.horario} ` : ""}{evento.titulo}
-                                  </span>
-                                ))}
-                                {eventos.length > 3 && (
-                                  <span className="text-[10px] text-slate-400 px-1">+{eventos.length - 3} mais</span>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </section>
+  setSalvandoEvento(true);
 
-            <section className="mt-5 sm:mt-6 bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <div>
-                  <h3 className="text-xl font-bold">📌 Próximas programações</h3>
-                  <p className="text-sm text-slate-500 mt-1">O que vocês não querem esquecer.</p>
-                </div>
-                <span className="text-sm text-slate-400">{eventosAgenda.length} cadastrada(s)</span>
-              </div>
+  const dados = {
+    titulo: tituloEvento.trim(),
+    data: dataEvento,
+    horario: horarioEvento || null,
+    categoria: categoriaEvento || "Outros",
+    descricao: descricaoEvento.trim() || null,
+    recorrencia: recorrenciaEvento || "nenhuma",
+    concluido: eventoEditando?.concluido ?? false,
+  };
 
-              {eventosAgenda.length === 0 ? (
-                <div className="py-8 text-center">
-                  <div className="text-5xl">❤️</div>
-                  <p className="font-semibold mt-3">Ainda não há programações.</p>
-                  <p className="text-sm text-slate-500 mt-1">Adicionem um passeio, compromisso ou data especial.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {eventosAgenda.slice(0, 10).map((evento) => (
-                    <div key={evento.id} className="border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-4">
-                      <button type="button" onClick={() => alternarConcluidoEvento(evento)} className={`w-11 h-11 rounded-xl shrink-0 ${evento.concluido ? "bg-green-50" : "bg-slate-50"}`}>
-                        {evento.concluido ? "✅" : "⭕"}
-                      </button>
-                      <button type="button" onClick={() => abrirEdicaoEvento(evento)} className="min-w-0 flex-1 text-left">
-                        <p className={`font-bold break-words ${evento.concluido ? "text-slate-400 line-through" : "text-slate-800"}`}>
-                          {evento.categoria === "Data importante" ? "❤️" : evento.categoria === "Compromisso" ? "📌" : evento.categoria === "Nossa casa" ? "🏠" : "💑"} {evento.titulo}
-                        </p>
-                        <p className="text-sm text-slate-500 mt-1">
-                          📅 {formatarDataAgenda(evento.data)}{evento.horario ? ` • ${evento.horario}` : ""}
-                          {evento.recorrencia && evento.recorrencia !== "nenhuma" ? ` • ${evento.recorrencia === "mensal" ? "todo mês" : "todo ano"}` : ""}
-                        </p>
-                        {evento.descricao && <p className="text-sm text-slate-500 mt-1 break-words">{evento.descricao}</p>}
-                      </button>
-                      <button type="button" onClick={() => excluirEventoAgenda(evento)} className="w-11 h-11 rounded-xl bg-red-50 text-red-500 shrink-0">
-                        🗑️
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </>
-        )}
+  const resposta = eventoEditando
+    ? await supabase
+        .from("agenda_eventos")
+        .update(dados)
+        .eq("id", eventoEditando.id)
+    : await supabase
+        .from("agenda_eventos")
+        .insert(dados);
 
+  if (resposta.error) {
+    setErro(resposta.error.message);
+    setSalvandoEvento(false);
+    return;
+  }
+
+  setModalAgenda(false);
+  setEventoEditando(null);
+  setSalvandoEvento(false);
+
+  /*
+   * A notificação continua sendo apenas interna
+   * ao sistema. Não existe mais envio Push.
+   */
+  await registrarNotificacao(
+    eventoEditando
+      ? "Programação atualizada"
+      : "Nova programação adicionada",
+    `${dados.titulo} — ${formatarDataAgenda(dados.data)}${
+      dados.horario ? ` às ${dados.horario}` : ""
+    }.`,
+    "agenda"
+  );
+
+  await buscarDados();
+}
+
+async function alternarConcluidoEvento(
+  evento: EventoAgenda
+) {
+  const novoStatus = !evento.concluido;
+
+  const { error } = await supabase
+    .from("agenda_eventos")
+    .update({
+      concluido: novoStatus,
+    })
+    .eq("id", evento.id);
+
+  if (error) {
+    setErro(error.message);
+    return;
+  }
+
+  await registrarNotificacao(
+    novoStatus
+      ? "Programação concluída"
+      : "Programação reaberta",
+    `${evento.titulo} foi ${
+      novoStatus
+        ? "marcada como concluída"
+        : "marcada novamente como pendente"
+    }.`,
+    "agenda"
+  );
+
+  await buscarDados();
+}
+
+async function excluirEventoAgenda(
+  evento: EventoAgenda
+) {
+  const { error } = await supabase
+    .from("agenda_eventos")
+    .delete()
+    .eq("id", evento.id);
+
+  if (error) {
+    setErro(error.message);
+    return;
+  }
+
+  await registrarNotificacao(
+    "Programação removida",
+    `${evento.titulo} foi removida da nossa agenda.`,
+    "agenda"
+  );
+
+  await buscarDados();
+}
+
+function separarDataAgenda(dataString: string) {
+  const partes = String(dataString || "")
+    .slice(0, 10)
+    .split("-")
+    .map(Number);
+
+  const ano = partes[0];
+  const mes = partes[1];
+  const dia = partes[2];
+
+  return {
+    ano: Number.isFinite(ano) ? ano : 0,
+    mes: Number.isFinite(mes) ? mes : 0,
+    dia: Number.isFinite(dia) ? dia : 0,
+  };
+}
+
+function normalizarRecorrenciaEvento(
+  evento: EventoAgenda
+) {
+  return String(evento.recorrencia || "nenhuma")
+    .trim()
+    .toLowerCase();
+}
+
+/*
+ * Retorna quantos dias existem no mês informado.
+ */
+function diasNoMes(ano: number, mes: number) {
+  return new Date(ano, mes + 1, 0).getDate();
+}
+
+/*
+ * Calcula a data em que um evento recorrente acontece
+ * dentro do mês/ano que está sendo visualizado.
+ */
+function dataOcorrenciaEvento(
+  evento: EventoAgenda,
+  ano: number,
+  mes: number
+): number | null {
+  const dataOriginal = separarDataAgenda(evento.data);
+  const recorrencia = normalizarRecorrenciaEvento(evento);
+
+  if (
+    !dataOriginal.ano ||
+    !dataOriginal.mes ||
+    !dataOriginal.dia
+  ) {
+    return null;
+  }
+
+  /*
+   * Evento único:
+   * só existe exatamente na data cadastrada.
+   */
+  if (recorrencia === "nenhuma") {
+    if (
+      dataOriginal.ano !== ano ||
+      dataOriginal.mes !== mes + 1
+    ) {
+      return null;
+    }
+
+    return dataOriginal.dia;
+  }
+
+  /*
+   * Evento mensal:
+   *
+   * O evento começa na data cadastrada e se repete
+   * nos meses seguintes.
+   *
+   * Exemplo:
+   * 15/09 -> 15/10 -> 15/11 -> 15/12
+   *
+   * Também protegemos meses que não possuem aquele dia.
+   * Ex.: dia 31 em fevereiro.
+   */
+  if (recorrencia === "mensal") {
+    const dataVisualizada = new Date(
+      ano,
+      mes,
+      1
+    );
+
+    const dataInicial = new Date(
+      dataOriginal.ano,
+      dataOriginal.mes - 1,
+      1
+    );
+
+    if (dataVisualizada < dataInicial) {
+      return null;
+    }
+
+    const ultimoDia = diasNoMes(ano, mes);
+
+    return Math.min(
+      dataOriginal.dia,
+      ultimoDia
+    );
+  }
+
+  /*
+   * Evento anual:
+   *
+   * Exemplo:
+   * 13/04/2026
+   * 13/04/2027
+   * 13/04/2028
+   */
+  if (recorrencia === "anual") {
+    if (
+      ano < dataOriginal.ano ||
+      mes + 1 !== dataOriginal.mes
+    ) {
+      return null;
+    }
+
+    const ultimoDia = diasNoMes(ano, mes);
+
+    return Math.min(
+      dataOriginal.dia,
+      ultimoDia
+    );
+  }
+
+  return null;
+}
+
+function eventoAconteceNoDia(
+  evento: EventoAgenda,
+  dia: number
+) {
+  const diaOcorrencia = dataOcorrenciaEvento(
+    evento,
+    anoAgenda,
+    mesAgenda
+  );
+
+  return diaOcorrencia === dia;
+}
+
+function formatarDataAgenda(
+  dataString: string
+) {
+  const data = String(dataString || "").slice(
+    0,
+    10
+  );
+
+  const [ano, mes, dia] = data.split("-");
+
+  if (!ano || !mes || !dia) {
+    return dataString;
+  }
+
+  return `${dia}/${mes}/${ano}`;
+}
+
+function eventosDoDia(dia: number) {
+  return eventosAgenda.filter((evento) =>
+    eventoAconteceNoDia(evento, dia)
+  );
+}
+
+function mudarMesAgenda(direcao: number) {
+  const novaData = new Date(
+    anoAgenda,
+    mesAgenda + direcao,
+    1
+  );
+
+  setMesAgenda(novaData.getMonth());
+  setAnoAgenda(novaData.getFullYear());
+}
         {/* ENXOVAL */}
 
         {abaAtiva ===
