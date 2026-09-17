@@ -4589,11 +4589,11 @@ function CardItem({
       }`}
     >
       {item.imagem_url && (
-        <div className="h-48 sm:h-52 bg-slate-50 border-b border-slate-100">
+        <div className="w-full aspect-[4/3] max-h-56 bg-slate-50 border-b border-slate-100 overflow-hidden flex items-center justify-center">
           <img
             src={item.imagem_url}
             alt={item.nome}
-            className={`w-full h-full object-contain ${
+            className={`w-full h-full object-contain p-2 ${
               item.comprado ? "opacity-60" : ""
             }`}
           />
