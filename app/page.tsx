@@ -54,6 +54,7 @@ categoria: string | null;
 descricao: string | null;
 recorrencia: string | null;
 concluido: boolean | null;
+emoji: string | null;
 created_at?: string;
 };
 
@@ -162,6 +163,9 @@ useState("");
 
 const [categoriaEvento, setCategoriaEvento] =
 useState("Fazer juntos");
+
+const [emojiEvento, setEmojiEvento] =
+useState("💑");
 
 const [descricaoEvento, setDescricaoEvento] =
 useState("");
@@ -1435,12 +1439,51 @@ dataBase = new Date()
   return `${ano}-${mes}-${dia}`;
 }
 
+const EMOJIS_AGENDA = [
+  "💑",
+  "🎂",
+  "🎉",
+  "📌",
+  "🏠",
+  "✈️",
+  "🍽️",
+  "🎬",
+  "🎡",
+  "🎁",
+  "🛍️",
+  "💰",
+  "📚",
+  "☕",
+  "🎮",
+  "📅",
+];
+
+function emojiPadraoPorCategoria(categoria: string | null) {
+  switch (categoria) {
+    case "Data importante":
+      return "🎉";
+    case "Compromisso":
+      return "📌";
+    case "Nossa casa":
+      return "🏠";
+    case "Fazer juntos":
+      return "💑";
+    default:
+      return "📅";
+  }
+}
+
+function emojiDoEvento(evento: EventoAgenda) {
+  return evento.emoji || emojiPadraoPorCategoria(evento.categoria);
+}
+
 function abrirNovoEvento(dataSelecionada = dataLocalString()) {
   setEventoEditando(null);
   setTituloEvento("");
   setDataEvento(dataSelecionada);
   setHorarioEvento("");
   setCategoriaEvento("Fazer juntos");
+  setEmojiEvento("💑");
   setDescricaoEvento("");
   setRecorrenciaEvento("nenhuma");
   setErro("");
@@ -1453,6 +1496,7 @@ function abrirEdicaoEvento(evento: EventoAgenda) {
   setDataEvento(evento.data);
   setHorarioEvento(evento.horario || "");
   setCategoriaEvento(evento.categoria || "Fazer juntos");
+  setEmojiEvento(evento.emoji || emojiPadraoPorCategoria(evento.categoria));
   setDescricaoEvento(evento.descricao || "");
   setRecorrenciaEvento(evento.recorrencia || "nenhuma");
   setErro("");
@@ -1480,6 +1524,7 @@ async function salvarEventoAgenda(evento: FormEvent) {
     data: dataEvento,
     horario: horarioEvento || null,
     categoria: categoriaEvento || "Outros",
+    emoji: emojiEvento || emojiPadraoPorCategoria(categoriaEvento),
     descricao: descricaoEvento.trim() || null,
     recorrencia: recorrenciaEvento || "nenhuma",
     concluido: eventoEditando?.concluido || false,
@@ -3182,7 +3227,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                                       }`}
                                     >
                                       {evento.concluido ? "✓ " : ""}
-                                      {evento.titulo}
+                                      {emojiDoEvento(evento)} {evento.titulo}
                                     </p>
                                     {evento.horario && (
                                       <p className="text-[8px] sm:text-[10px] text-slate-500 mt-0.5 truncate">
@@ -3226,8 +3271,8 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                   eventosDoDia(dia).map((evento) => ({ dia, evento }))
                 ).length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
-                    <div className="text-4xl">❤️</div>
-                    <p className="font-semibold text-slate-700 mt-3">
+                    <div className="text-4xl">📅</div>
+                    <p className="font-semibold text-slate-700 mt-3>
                       Nenhuma programação neste mês.
                     </p>
                     <p className="text-sm text-slate-500 mt-1">
@@ -3273,7 +3318,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                               : "text-slate-800"
                           }`}
                         >
-                          {evento.concluido ? "✓ " : "❤️ "}
+                          {evento.concluido ? "✓ " : `${emojiDoEvento(evento)} `}
                           {evento.titulo}
                         </h4>
 
@@ -3550,7 +3595,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
   {modalAgenda && (
     <Modal>
       <CabecalhoModal
-        titulo={eventoEditando ? "✏️ Editar programação" : "❤️ Nova programação"}
+        titulo={eventoEditando ? "✏️ Editar programação" : "📅 Nova programação"}
         descricao="Registre algo que vocês querem viver, lembrar ou resolver juntos."
         fechar={() => setModalAgenda(false)}
       />
@@ -3589,6 +3634,35 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
             <option>Nossa casa</option>
             <option>Outros</option>
           </select>
+        </div>
+
+        <div className="mb-5">
+          <label className="block font-medium mb-2 text-slate-700">
+            Emoji da programação
+          </label>
+
+          <div className="grid grid-cols-8 gap-2">
+            {EMOJIS_AGENDA.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => setEmojiEvento(emoji)}
+                className={`h-11 rounded-xl border text-xl transition ${
+                  emojiEvento === emoji
+                    ? "border-pink-500 bg-pink-50 ring-2 ring-pink-200"
+                    : "border-slate-200 bg-white hover:bg-slate-50"
+                }`}
+                aria-label={`Selecionar emoji ${emoji}`}
+                aria-pressed={emojiEvento === emoji}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+
+          <p className="text-xs text-slate-500 mt-2">
+            Escolha o emoji que melhor representa essa programação.
+          </p>
         </div>
 
         <div className="mb-4">
