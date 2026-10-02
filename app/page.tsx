@@ -2542,7 +2542,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
               : "text-slate-600 hover:bg-slate-100"
           }`}
         >
-          💰 Finanças
+          💵 Finanças
         </button>
 
         <button
@@ -2667,7 +2667,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
             ],
             [
               "financas",
-              "💰 Finanças",
+              "💵 Finanças",
             ],
             [
               "planejamento",
@@ -3582,7 +3582,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-6">
               <div>
                 <p className="text-slate-500">Organizem o dinheiro de vocês em um só lugar</p>
-                <h2 className="text-3xl md:text-4xl font-bold mt-2">💰 Finanças</h2>
+                <h2 className="text-3xl md:text-4xl font-bold mt-2">💵 Finanças</h2>
                 <p className="text-slate-500 mt-2 max-w-2xl">
                   Salários, gastos, dívidas, parcelas, categorias e vencimentos com cálculos automáticos.
                 </p>
