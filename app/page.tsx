@@ -58,6 +58,48 @@ emoji: string | null;
 created_at?: string;
 };
 
+type FinanceiroLancamento = {
+id: string;
+pessoa: string;
+tipo: "salario" | "gasto";
+descricao: string;
+valor: number;
+data: string;
+categoria: string | null;
+created_at?: string;
+};
+
+type FinanceiroCategoria = {
+id: string;
+pessoa: string;
+nome: string;
+emoji: string;
+created_at?: string;
+};
+
+type DividaFinanceira = {
+id: string;
+pessoa: string;
+nome: string;
+valor_total: number;
+parcelas_total: number;
+valor_parcela: number;
+data_primeira: string;
+categoria: string | null;
+status: string;
+created_at?: string;
+};
+
+type ParcelaFinanceira = {
+id: string;
+divida_id: string;
+numero: number;
+valor: number;
+vencimento: string;
+paga: boolean;
+data_pagamento: string | null;
+};
+
 type Notificacao = {
 id: string;
 titulo: string;
@@ -69,6 +111,7 @@ created_at?: string;
 
 type Aba =
 | "visao-geral"
+| "financas"
 | "aportes"
 | "planejamento"
 | "itens"
@@ -103,6 +146,25 @@ const EMOJIS_TEMAS_ENXOVAL: Record<string, string> = {
 
 const formatarTemaEnxoval = (tema: string) =>
   `${EMOJIS_TEMAS_ENXOVAL[tema] || "📦"} ${tema}`;
+
+
+const CATEGORIAS_FINANCEIRAS_PADRAO = [
+  { nome: "Casa", emoji: "🏠" },
+  { nome: "Alimentação", emoji: "🍔" },
+  { nome: "Transporte", emoji: "🚗" },
+  { nome: "Cartão", emoji: "💳" },
+  { nome: "Lazer", emoji: "🎮" },
+  { nome: "Estudos", emoji: "📚" },
+  { nome: "Viagem", emoji: "✈️" },
+  { nome: "Saúde", emoji: "❤️" },
+  { nome: "Outros", emoji: "📦" },
+];
+
+const EMOJIS_FINANCEIROS = [
+  "🏠","🍔","🚗","💳","🎮","📚","✈️","❤️",
+  "🛒","📱","💡","💰","🎁","☕","🐶","📦",
+];
+
 
 /* ================================================= */
 /* COMPONENTE PRINCIPAL */
@@ -398,6 +460,36 @@ setSalvandoEdicaoItem,
 
 const [temaEnxovalSelecionado, setTemaEnxovalSelecionado] = useState<string | null>(null);
 
+
+/* FINANÇAS */
+const [abaFinancas, setAbaFinancas] = useState<"casal" | "julia" | "paulo">("casal");
+const [lancamentosFinanceiros, setLancamentosFinanceiros] = useState<FinanceiroLancamento[]>([]);
+const [categoriasFinanceiras, setCategoriasFinanceiras] = useState<FinanceiroCategoria[]>([]);
+const [dividasFinanceiras, setDividasFinanceiras] = useState<DividaFinanceira[]>([]);
+const [parcelasFinanceiras, setParcelasFinanceiras] = useState<ParcelaFinanceira[]>([]);
+const [mesFinanceiro, setMesFinanceiro] = useState(new Date().getMonth());
+const [anoFinanceiro, setAnoFinanceiro] = useState(new Date().getFullYear());
+
+const [modalFinanceiro, setModalFinanceiro] = useState<"salario" | "gasto" | "divida" | "categoria" | null>(null);
+const [lancamentoEditando, setLancamentoEditando] = useState<FinanceiroLancamento | null>(null);
+const [dividaEditando, setDividaEditando] = useState<DividaFinanceira | null>(null);
+const [categoriaEditando, setCategoriaEditando] = useState<FinanceiroCategoria | null>(null);
+const [descricaoFinanceira, setDescricaoFinanceira] = useState("");
+const [valorFinanceiro, setValorFinanceiro] = useState("");
+const [dataFinanceira, setDataFinanceira] = useState(new Date().toISOString().split("T")[0]);
+const [categoriaFinanceira, setCategoriaFinanceira] = useState("");
+const [nomeCategoriaFinanceira, setNomeCategoriaFinanceira] = useState("");
+const [emojiCategoriaFinanceira, setEmojiCategoriaFinanceira] = useState("📦");
+const [nomeDividaFinanceira, setNomeDividaFinanceira] = useState("");
+const [valorTotalDivida, setValorTotalDivida] = useState("");
+const [parcelasDivida, setParcelasDivida] = useState("1");
+const [valorParcelaDivida, setValorParcelaDivida] = useState("");
+const [dataPrimeiraDivida, setDataPrimeiraDivida] = useState(new Date().toISOString().split("T")[0]);
+const [categoriaDivida, setCategoriaDivida] = useState("");
+const [salvandoFinanceiro, setSalvandoFinanceiro] = useState(false);
+const [parcelaEditando, setParcelaEditando] = useState<ParcelaFinanceira | null>(null);
+const [valorParcelaEdicao, setValorParcelaEdicao] = useState("");
+
 /* EXCLUIR ITEM */
 
 const [
@@ -521,6 +613,10 @@ try {
     respostaPlanejamento,
     respostaAgenda,
     respostaNotificacoes,
+    respostaLancamentosFinanceiros,
+    respostaCategoriasFinanceiras,
+    respostaDividasFinanceiras,
+    respostaParcelasFinanceiras,
   ] = await Promise.all([
     supabase
       .from("aportes")
@@ -577,6 +673,26 @@ try {
         ascending: false,
       })
       .limit(30),
+
+    supabase
+      .from("financas_lancamentos")
+      .select("*")
+      .order("data", { ascending: false }),
+
+    supabase
+      .from("financas_categorias")
+      .select("*")
+      .order("nome", { ascending: true }),
+
+    supabase
+      .from("financas_dividas")
+      .select("*")
+      .order("data_primeira", { ascending: true }),
+
+    supabase
+      .from("financas_parcelas")
+      .select("*")
+      .order("vencimento", { ascending: true }),
   ]);
 
   if (respostaAportes.error) {
@@ -607,6 +723,22 @@ try {
 
   if (!respostaNotificacoes.error) {
     setNotificacoes(respostaNotificacoes.data || []);
+  }
+
+  if (!respostaLancamentosFinanceiros.error) {
+    setLancamentosFinanceiros(respostaLancamentosFinanceiros.data || []);
+  }
+
+  if (!respostaCategoriasFinanceiras.error) {
+    setCategoriasFinanceiras(respostaCategoriasFinanceiras.data || []);
+  }
+
+  if (!respostaDividasFinanceiras.error) {
+    setDividasFinanceiras(respostaDividasFinanceiras.data || []);
+  }
+
+  if (!respostaParcelasFinanceiras.error) {
+    setParcelasFinanceiras(respostaParcelasFinanceiras.data || []);
   }
 
   const listaAportes =
@@ -1427,6 +1559,375 @@ await buscarDados();
 }
 
 /* ================================================= */
+/* FINANÇAS */
+/* ================================================= */
+
+function pessoaFinanceiraAtual() {
+  return abaFinancas;
+}
+
+function nomePessoaFinanceira(pessoa: string) {
+  if (pessoa === "julia") return "Júlia";
+  if (pessoa === "paulo") return "Paulo";
+  return "Casal";
+}
+
+function categoriasDaAbaFinanceira() {
+  return categoriasFinanceiras.filter(
+    (categoria) => categoria.pessoa === abaFinancas || categoria.pessoa === "casal"
+  );
+}
+
+function dividasDaAbaFinanceira() {
+  return dividasFinanceiras.filter((divida) => divida.pessoa === abaFinancas);
+}
+
+function lancamentosDaAbaFinanceira() {
+  return lancamentosFinanceiros.filter((item) => item.pessoa === abaFinancas);
+}
+
+function parcelasDaAbaFinanceira() {
+  const ids = new Set(dividasDaAbaFinanceira().map((divida) => divida.id));
+  return parcelasFinanceiras.filter((parcela) => ids.has(parcela.divida_id));
+}
+
+function abrirNovoLancamentoFinanceiro(tipo: "salario" | "gasto") {
+  setLancamentoEditando(null);
+  setDescricaoFinanceira("");
+  setValorFinanceiro("");
+  setDataFinanceira(dataLocalString());
+  setCategoriaFinanceira(categoriasDaAbaFinanceira()[0]?.nome || "");
+  setModalFinanceiro(tipo);
+}
+
+function abrirEdicaoLancamentoFinanceiro(item: FinanceiroLancamento) {
+  setLancamentoEditando(item);
+  setDescricaoFinanceira(item.descricao);
+  setValorFinanceiro(String(item.valor));
+  setDataFinanceira(item.data);
+  setCategoriaFinanceira(item.categoria || "");
+  setModalFinanceiro(item.tipo);
+}
+
+async function salvarLancamentoFinanceiro(evento: FormEvent) {
+  evento.preventDefault();
+  setErro("");
+
+  if (!descricaoFinanceira.trim() || Number(valorFinanceiro) <= 0 || !dataFinanceira) {
+    setErro("Preencha descrição, valor e data.");
+    return;
+  }
+
+  setSalvandoFinanceiro(true);
+
+  const dados = {
+    pessoa: pessoaFinanceiraAtual(),
+    tipo: modalFinanceiro === "salario" ? "salario" : "gasto",
+    descricao: descricaoFinanceira.trim(),
+    valor: Number(valorFinanceiro),
+    data: dataFinanceira,
+    categoria: categoriaFinanceira || null,
+  };
+
+  const resposta = lancamentoEditando
+    ? await supabase.from("financas_lancamentos").update(dados).eq("id", lancamentoEditando.id)
+    : await supabase.from("financas_lancamentos").insert(dados);
+
+  if (resposta.error) {
+    setErro(resposta.error.message);
+    setSalvandoFinanceiro(false);
+    return;
+  }
+
+  setModalFinanceiro(null);
+  setLancamentoEditando(null);
+  setSalvandoFinanceiro(false);
+
+  await registrarNotificacao(
+    modalFinanceiro === "salario" ? "Salário atualizado" : "Gasto registrado",
+    `${dados.descricao}: ${formatarMoeda(dados.valor)}.`,
+    "financeiro"
+  );
+  await buscarDados();
+}
+
+async function excluirLancamentoFinanceiro(item: FinanceiroLancamento) {
+  const confirmar = window.confirm(`Apagar "${item.descricao}"?`);
+  if (!confirmar) return;
+
+  const { error } = await supabase.from("financas_lancamentos").delete().eq("id", item.id);
+  if (error) {
+    setErro(error.message);
+    return;
+  }
+  await buscarDados();
+}
+
+function abrirNovaDividaFinanceira() {
+  setDividaEditando(null);
+  setNomeDividaFinanceira("");
+  setValorTotalDivida("");
+  setParcelasDivida("1");
+  setValorParcelaDivida("");
+  setDataPrimeiraDivida(dataLocalString());
+  setCategoriaDivida(categoriasDaAbaFinanceira()[0]?.nome || "");
+  setModalFinanceiro("divida");
+}
+
+function abrirEdicaoDividaFinanceira(divida: DividaFinanceira) {
+  setDividaEditando(divida);
+  setNomeDividaFinanceira(divida.nome);
+  setValorTotalDivida(String(divida.valor_total));
+  setParcelasDivida(String(divida.parcelas_total));
+  setValorParcelaDivida(String(divida.valor_parcela));
+  setDataPrimeiraDivida(divida.data_primeira);
+  setCategoriaDivida(divida.categoria || "");
+  setModalFinanceiro("divida");
+}
+
+function adicionarMeses(dataBase: string, meses: number) {
+  const [ano, mes, dia] = dataBase.split("-").map(Number);
+  const data = new Date(ano, mes - 1 + meses, dia);
+  const ultimoDia = new Date(data.getFullYear(), data.getMonth() + 1, 0).getDate();
+  data.setDate(Math.min(dia, ultimoDia));
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(data.getDate()).padStart(2, "0")}`;
+}
+
+async function salvarDividaFinanceira(evento: FormEvent) {
+  evento.preventDefault();
+  setErro("");
+
+  const totalParcelas = Math.max(1, Number(parcelasDivida));
+  const valorTotal = Number(valorTotalDivida);
+  const valorParcela = Number(valorParcelaDivida || (valorTotal / totalParcelas));
+
+  if (!nomeDividaFinanceira.trim() || valorTotal <= 0 || totalParcelas <= 0 || valorParcela <= 0 || !dataPrimeiraDivida) {
+    setErro("Preencha nome, valor total, parcelas, valor mensal e primeira data.");
+    return;
+  }
+
+  setSalvandoFinanceiro(true);
+
+  if (dividaEditando) {
+    const { error } = await supabase
+      .from("financas_dividas")
+      .update({
+        nome: nomeDividaFinanceira.trim(),
+        valor_total: valorTotal,
+        parcelas_total: totalParcelas,
+        valor_parcela: valorParcela,
+        data_primeira: dataPrimeiraDivida,
+        categoria: categoriaDivida || null,
+        status: "ativa",
+      })
+      .eq("id", dividaEditando.id);
+
+    if (error) {
+      setErro(error.message);
+      setSalvandoFinanceiro(false);
+      return;
+    }
+
+    const parcelasDaDivida = parcelasFinanceiras.filter((p) => p.divida_id === dividaEditando.id);
+    for (const parcela of parcelasDaDivida) {
+      if (!parcela.paga) {
+        const novaVencimento = adicionarMeses(dataPrimeiraDivida, parcela.numero - 1);
+        await supabase
+          .from("financas_parcelas")
+          .update({ valor: valorParcela, vencimento: novaVencimento })
+          .eq("id", parcela.id);
+      }
+    }
+  } else {
+    const { data: novaDivida, error } = await supabase
+      .from("financas_dividas")
+      .insert({
+        pessoa: pessoaFinanceiraAtual(),
+        nome: nomeDividaFinanceira.trim(),
+        valor_total: valorTotal,
+        parcelas_total: totalParcelas,
+        valor_parcela: valorParcela,
+        data_primeira: dataPrimeiraDivida,
+        categoria: categoriaDivida || null,
+        status: "ativa",
+      })
+      .select("*")
+      .single();
+
+    if (error || !novaDivida) {
+      setErro(error?.message || "Não foi possível criar a dívida.");
+      setSalvandoFinanceiro(false);
+      return;
+    }
+
+    const parcelas = Array.from({ length: totalParcelas }, (_, index) => ({
+      divida_id: novaDivida.id,
+      numero: index + 1,
+      valor: index === totalParcelas - 1
+        ? Math.max(0, Number((valorTotal - valorParcela * (totalParcelas - 1)).toFixed(2)))
+        : valorParcela,
+      vencimento: adicionarMeses(dataPrimeiraDivida, index),
+      paga: false,
+      data_pagamento: null,
+    }));
+
+    const { error: erroParcelas } = await supabase
+      .from("financas_parcelas")
+      .insert(parcelas);
+
+    if (erroParcelas) {
+      setErro(erroParcelas.message);
+      setSalvandoFinanceiro(false);
+      return;
+    }
+  }
+
+  setModalFinanceiro(null);
+  setDividaEditando(null);
+  setSalvandoFinanceiro(false);
+
+  await registrarNotificacao(
+    dividaEditando ? "Dívida atualizada" : "Nova dívida adicionada",
+    `${nomeDividaFinanceira.trim()} — ${totalParcelas} parcela(s).`,
+    "financeiro"
+  );
+  await buscarDados();
+}
+
+async function excluirDividaFinanceira(divida: DividaFinanceira) {
+  const confirmar = window.confirm(`Apagar a dívida "${divida.nome}" e todas as parcelas?`);
+  if (!confirmar) return;
+
+  const { error } = await supabase.from("financas_dividas").delete().eq("id", divida.id);
+  if (error) {
+    setErro(error.message);
+    return;
+  }
+  await buscarDados();
+}
+
+async function alternarParcelaFinanceira(parcela: ParcelaFinanceira) {
+  const novaPaga = !parcela.paga;
+  const { error } = await supabase
+    .from("financas_parcelas")
+    .update({
+      paga: novaPaga,
+      data_pagamento: novaPaga ? dataLocalString() : null,
+    })
+    .eq("id", parcela.id);
+
+  if (error) {
+    setErro(error.message);
+    return;
+  }
+
+  const divida = dividasFinanceiras.find((item) => item.id === parcela.divida_id);
+  if (divida) {
+    const todas = parcelasFinanceiras.filter((item) => item.divida_id === divida.id);
+    const pagas = todas.filter((item) => item.id === parcela.id ? novaPaga : item.paga).length;
+    if (pagas >= divida.parcelas_total) {
+      await supabase.from("financas_dividas").update({ status: "quitada" }).eq("id", divida.id);
+    } else {
+      await supabase.from("financas_dividas").update({ status: "ativa" }).eq("id", divida.id);
+    }
+  }
+
+  await buscarDados();
+}
+
+async function salvarValorParcelaFinanceira(evento: FormEvent) {
+  evento.preventDefault();
+  if (!parcelaEditando || Number(valorParcelaEdicao) <= 0) return;
+
+  const { error } = await supabase
+    .from("financas_parcelas")
+    .update({ valor: Number(valorParcelaEdicao) })
+    .eq("id", parcelaEditando.id);
+
+  if (error) {
+    setErro(error.message);
+    return;
+  }
+
+  setParcelaEditando(null);
+  setValorParcelaEdicao("");
+  await buscarDados();
+}
+
+function abrirEdicaoParcelaFinanceira(parcela: ParcelaFinanceira) {
+  setParcelaEditando(parcela);
+  setValorParcelaEdicao(String(parcela.valor));
+}
+
+async function salvarCategoriaFinanceira(evento: FormEvent) {
+  evento.preventDefault();
+  if (!nomeCategoriaFinanceira.trim()) {
+    setErro("Digite o nome da categoria.");
+    return;
+  }
+
+  const dados = {
+    pessoa: abaFinancas,
+    nome: nomeCategoriaFinanceira.trim(),
+    emoji: emojiCategoriaFinanceira || "📦",
+  };
+
+  const resposta = categoriaEditando
+    ? await supabase.from("financas_categorias").update(dados).eq("id", categoriaEditando.id)
+    : await supabase.from("financas_categorias").insert(dados);
+
+  if (resposta.error) {
+    setErro(resposta.error.message);
+    return;
+  }
+
+  setModalFinanceiro(null);
+  setCategoriaEditando(null);
+  setNomeCategoriaFinanceira("");
+  setEmojiCategoriaFinanceira("📦");
+  await buscarDados();
+}
+
+async function excluirCategoriaFinanceira(categoria: FinanceiroCategoria) {
+  const usada = categoriasFinanceiras.some((c) => c.id === categoria.id);
+  if (!usada) return;
+
+  const confirmar = window.confirm(`Apagar a categoria "${categoria.nome}"?`);
+  if (!confirmar) return;
+
+  const { error } = await supabase.from("financas_categorias").delete().eq("id", categoria.id);
+  if (error) {
+    setErro("Essa categoria pode estar sendo usada. Altere os registros antes de excluir.");
+    return;
+  }
+  await buscarDados();
+}
+
+function abrirNovaCategoriaFinanceira() {
+  setCategoriaEditando(null);
+  setNomeCategoriaFinanceira("");
+  setEmojiCategoriaFinanceira("📦");
+  setModalFinanceiro("categoria");
+}
+
+function abrirEdicaoCategoriaFinanceira(categoria: FinanceiroCategoria) {
+  setCategoriaEditando(categoria);
+  setNomeCategoriaFinanceira(categoria.nome);
+  setEmojiCategoriaFinanceira(categoria.emoji);
+  setModalFinanceiro("categoria");
+}
+
+function formatarDataCurta(data: string) {
+  return new Date(`${data}T12:00:00`).toLocaleDateString("pt-BR");
+}
+
+function deslocarMesFinanceiro(delta: number) {
+  const novaData = new Date(anoFinanceiro, mesFinanceiro + delta, 1);
+  setMesFinanceiro(novaData.getMonth());
+  setAnoFinanceiro(novaData.getFullYear());
+}
+
+/* ================================================= */
 /* NOSSA AGENDA */
 /* ================================================= */
 
@@ -2032,6 +2533,21 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
         <button
           onClick={() =>
             setAbaAtiva(
+              "financas"
+            )
+          }
+          className={`w-full text-left px-4 py-3 rounded-xl transition font-medium ${
+            abaAtiva === "financas"
+              ? "bg-emerald-50 text-emerald-600"
+              : "text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          💰 Finanças
+        </button>
+
+        <button
+          onClick={() =>
+            setAbaAtiva(
               "planejamento"
             )
           }
@@ -2148,6 +2664,10 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
             [
               "aportes",
               "💰 Aportes",
+            ],
+            [
+              "financas",
+              "💰 Finanças",
             ],
             [
               "planejamento",
@@ -3055,6 +3575,219 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
           </>
         )}
 
+        {/* FINANÇAS */}
+
+        {abaAtiva === "financas" && (
+          <>
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-6">
+              <div>
+                <p className="text-slate-500">Organizem o dinheiro de vocês em um só lugar</p>
+                <h2 className="text-3xl md:text-4xl font-bold mt-2">💰 Finanças</h2>
+                <p className="text-slate-500 mt-2 max-w-2xl">
+                  Salários, gastos, dívidas, parcelas, categorias e vencimentos com cálculos automáticos.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl p-2 flex gap-2 overflow-x-auto mb-6">
+              {[
+                ["casal", "Casal"],
+                ["julia", "Júlia"],
+                ["paulo", "Paulo"],
+              ].map(([id, nome]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setAbaFinancas(id as "casal" | "julia" | "paulo")}
+                  className={`flex-1 min-w-[110px] px-4 py-3 rounded-xl font-semibold transition ${
+                    abaFinancas === id
+                      ? "bg-emerald-500 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  {nome}
+                </button>
+              ))}
+            </div>
+
+            {(() => {
+              const pessoa = pessoaFinanceiraAtual();
+              const lancamentos = lancamentosDaAbaFinanceira();
+              const dividas = dividasDaAbaFinanceira();
+              const parcelas = parcelasDaAbaFinanceira();
+              const mesAtual = `${anoFinanceiro}-${String(mesFinanceiro + 1).padStart(2, "0")}`;
+              const salariosMes = lancamentos
+                .filter((item) => item.tipo === "salario" && item.data.startsWith(mesAtual))
+                .reduce((soma, item) => soma + Number(item.valor || 0), 0);
+              const gastosMes = lancamentos
+                .filter((item) => item.tipo === "gasto" && item.data.startsWith(mesAtual))
+                .reduce((soma, item) => soma + Number(item.valor || 0), 0);
+              const parcelasMes = parcelas
+                .filter((parcela) => !parcela.paga && parcela.vencimento.startsWith(mesAtual))
+                .reduce((soma, parcela) => soma + Number(parcela.valor || 0), 0);
+              const disponivel = salariosMes - gastosMes - parcelasMes;
+              const parcelasPendentes = parcelas.filter((parcela) => !parcela.paga);
+              const categorias = categoriasDaAbaFinanceira();
+              const inicioMes = new Date(anoFinanceiro, mesFinanceiro, 1);
+              const primeiroDiaSemana = inicioMes.getDay();
+              const diasNoMes = new Date(anoFinanceiro, mesFinanceiro + 1, 0).getDate();
+              const parcelasDoMes = parcelas.filter((parcela) => parcela.vencimento.startsWith(mesAtual));
+              const gastosDoMes = lancamentos.filter((item) => item.tipo === "gasto" && item.data.startsWith(mesAtual));
+
+              return (
+                <>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <ResumoFinanceiroCard titulo="Salário" valor={formatarMoeda(salariosMes)} icone="💵" />
+                    <ResumoFinanceiroCard titulo="Gastos" valor={formatarMoeda(gastosMes)} icone="📤" />
+                    <ResumoFinanceiroCard titulo="Parcelas" valor={formatarMoeda(parcelasMes)} icone="💳" />
+                    <ResumoFinanceiroCard titulo="Disponível" valor={formatarMoeda(disponivel)} icone="💰" />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                    <button type="button" onClick={() => abrirNovoLancamentoFinanceiro("salario")} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-3 rounded-2xl font-semibold">+ 💵 Salário</button>
+                    <button type="button" onClick={() => abrirNovoLancamentoFinanceiro("gasto")} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-3 rounded-2xl font-semibold">+ 📤 Gasto</button>
+                    <button type="button" onClick={abrirNovaDividaFinanceira} className="bg-pink-500 hover:bg-pink-600 text-white px-4 py-3 rounded-2xl font-semibold">+ 💳 Dívida</button>
+                  </div>
+
+                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                    <section className="xl:col-span-2 bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
+                      <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Calendário financeiro</p>
+                          <h3 className="text-2xl font-bold mt-1">{nomeDoMes(mesFinanceiro + 1)} de {anoFinanceiro}</h3>
+                        </div>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => deslocarMesFinanceiro(-1)} className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50">←</button>
+                          <button type="button" onClick={() => { setMesFinanceiro(new Date().getMonth()); setAnoFinanceiro(new Date().getFullYear()); }} className="px-3 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm">Hoje</button>
+                          <button type="button" onClick={() => deslocarMesFinanceiro(1)} className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50">→</button>
+                        </div>
+                      </div>
+
+                      <div className="p-3 sm:p-5">
+                        <div className="grid grid-cols-7 text-center text-xs font-semibold text-slate-400 mb-2">
+                          {["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"].map((dia) => <div key={dia} className="py-2">{dia}</div>)}
+                        </div>
+                        <div className="grid grid-cols-7 gap-1">
+                          {Array.from({ length: primeiroDiaSemana }).map((_, index) => <div key={`vazio-${index}`} className="min-h-20 sm:min-h-24" />)}
+                          {Array.from({ length: diasNoMes }, (_, index) => {
+                            const dia = index + 1;
+                            const dataDia = `${anoFinanceiro}-${String(mesFinanceiro + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+                            const parcelasDia = parcelasDoMes.filter((parcela) => parcela.vencimento === dataDia);
+                            const gastosDia = gastosDoMes.filter((item) => item.data === dataDia);
+                            const hoje = dataLocalString() === dataDia;
+                            return (
+                              <div key={dataDia} className={`min-h-20 sm:min-h-24 border rounded-xl p-1.5 sm:p-2 ${hoje ? "border-emerald-400 bg-emerald-50/40" : "border-slate-100"}`}>
+                                <div className={`text-xs font-bold ${hoje ? "text-emerald-600" : "text-slate-500"}`}>{dia}</div>
+                                <div className="mt-1 space-y-1">
+                                  {parcelasDia.slice(0, 2).map((parcela) => {
+                                    const divida = dividasFinanceiras.find((item) => item.id === parcela.divida_id);
+                                    return <button type="button" key={parcela.id} onClick={() => alternarParcelaFinanceira(parcela)} className={`w-full text-left text-[10px] sm:text-xs rounded-lg px-1.5 py-1 ${parcela.paga ? "bg-emerald-100 text-emerald-700 line-through" : "bg-pink-50 text-pink-700"}`}>💳 {divida?.nome || "Parcela"}<br />{formatarMoeda(parcela.valor)}</button>;
+                                  })}
+                                  {gastosDia.slice(0, 1).map((gasto) => <button type="button" key={gasto.id} onClick={() => abrirEdicaoLancamentoFinanceiro(gasto)} className="w-full text-left text-[10px] sm:text-xs rounded-lg px-1.5 py-1 bg-slate-100 text-slate-700">📤 {formatarMoeda(gasto.valor)}</button>)}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
+                      <div className="p-5 border-b border-slate-100">
+                        <h3 className="text-xl font-bold">💳 Dívidas</h3>
+                        <p className="text-sm text-slate-500 mt-1">{dividas.filter((d) => d.status !== "quitada").length} em andamento • {dividas.filter((d) => d.status === "quitada").length} quitada(s)</p>
+                      </div>
+                      <div className="p-4 space-y-3 max-h-[520px] overflow-y-auto">
+                        {dividas.length === 0 ? (
+                          <div className="py-10 text-center text-slate-500">Nenhuma dívida cadastrada.</div>
+                        ) : dividas.map((divida) => {
+                          const parcelasDaDivida = parcelas.filter((p) => p.divida_id === divida.id);
+                          const pagas = parcelasDaDivida.filter((p) => p.paga).length;
+                          const quitada = pagas >= divida.parcelas_total;
+                          const restante = parcelasDaDivida.filter((p) => !p.paga).reduce((soma, p) => soma + Number(p.valor || 0), 0);
+                          return (
+                            <div key={divida.id} className={`border rounded-2xl p-4 ${quitada ? "border-emerald-200 bg-emerald-50/50" : "border-slate-200"}`}>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <h4 className="font-bold text-slate-800 break-words">{categorias.find((c) => c.nome === divida.categoria)?.emoji || "💳"} {divida.nome}</h4>
+                                  <p className="text-sm text-slate-500 mt-1">{pagas}/{divida.parcelas_total} parcelas {quitada ? "• ✅ Quitada" : `• ${formatarMoeda(restante)} restante`}</p>
+                                </div>
+                                <div className="flex gap-1">
+                                  <button type="button" onClick={() => abrirEdicaoDividaFinanceira(divida)} className="w-9 h-9 rounded-lg hover:bg-slate-100">✏️</button>
+                                  <button type="button" onClick={() => excluirDividaFinanceira(divida)} className="w-9 h-9 rounded-lg hover:bg-red-50">🗑️</button>
+                                </div>
+                              </div>
+                              <div className="mt-3 flex items-center justify-between text-sm">
+                                <span className="text-slate-500">{formatarMoeda(divida.valor_parcela)}/mês</span>
+                                <span className="font-semibold text-slate-700">{formatarMoeda(divida.valor_total)}</span>
+                              </div>
+                              <div className="mt-3 space-y-1">
+                                {parcelasDaDivida.slice(0, 12).map((parcela) => (
+                                  <div key={parcela.id} className="flex items-center gap-2">
+                                    <button type="button" onClick={() => alternarParcelaFinanceira(parcela)} className={`flex-1 text-left text-xs px-2 py-1.5 rounded-lg ${parcela.paga ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-600"}`}>
+                                      {parcela.paga ? "☑" : "☐"} {parcela.numero}/{divida.parcelas_total} — {formatarMoeda(parcela.valor)} — {formatarDataCurta(parcela.vencimento)}
+                                    </button>
+                                    <button type="button" onClick={() => abrirEdicaoParcelaFinanceira(parcela)} className="w-8 h-8 rounded-lg hover:bg-slate-100" title="Editar valor da parcela">✏️</button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  </div>
+
+                  <section className="mt-6 bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
+                    <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-xl font-bold">📊 Lançamentos de {nomePessoaFinanceira(pessoa)}</h3>
+                        <p className="text-sm text-slate-500 mt-1">Salários e gastos registrados.</p>
+                      </div>
+                      <button type="button" onClick={abrirNovaCategoriaFinanceira} className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 font-medium">🏷️ Categorias</button>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {lancamentos.length === 0 ? (
+                        <div className="p-8 text-center text-slate-500">Nenhum salário ou gasto cadastrado.</div>
+                      ) : lancamentos.slice(0, 30).map((item) => (
+                        <div key={item.id} className="p-4 flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl">{item.tipo === "salario" ? "💵" : "📤"}</div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-slate-800 truncate">{item.descricao}</p>
+                            <p className="text-xs text-slate-500">{formatarDataCurta(item.data)} {item.categoria ? `• ${item.categoria}` : ""}</p>
+                          </div>
+                          <strong className={item.tipo === "salario" ? "text-emerald-600" : "text-slate-700"}>{formatarMoeda(item.valor)}</strong>
+                          <button type="button" onClick={() => abrirEdicaoLancamentoFinanceiro(item)} className="w-9 h-9 rounded-lg hover:bg-slate-100">✏️</button>
+                          <button type="button" onClick={() => excluirLancamentoFinanceiro(item)} className="w-9 h-9 rounded-lg hover:bg-red-50">🗑️</button>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="mt-6 bg-white border border-slate-200 rounded-2xl sm:rounded-3xl p-5 sm:p-6">
+                    <div className="flex items-center justify-between gap-3 mb-4">
+                      <div>
+                        <h3 className="text-xl font-bold">🏷️ Categorias</h3>
+                        <p className="text-sm text-slate-500 mt-1">Personalize com nome e emoji.</p>
+                      </div>
+                      <button type="button" onClick={abrirNovaCategoriaFinanceira} className="bg-slate-800 text-white px-4 py-2.5 rounded-xl font-medium">+ Nova</button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {categorias.map((categoria) => (
+                        <div key={categoria.id} className="inline-flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-slate-50">
+                          <span>{categoria.emoji}</span><span className="text-sm font-medium">{categoria.nome}</span>
+                          <button type="button" onClick={() => abrirEdicaoCategoriaFinanceira(categoria)} className="text-xs">✏️</button>
+                          <button type="button" onClick={() => excluirCategoriaFinanceira(categoria)} className="text-xs">🗑️</button>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </>
+              );
+            })()}
+          </>
+        )}
+
         {/* NOSSA AGENDA */}
 
         {abaAtiva === "agenda" && (
@@ -3589,6 +4322,94 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
             )}
           </>
         )}
+
+  {/* MODAIS FINANÇAS */}
+
+  {modalFinanceiro === "salario" || modalFinanceiro === "gasto" ? (
+    <Modal>
+      <CabecalhoModal
+        titulo={`${lancamentoEditando ? "✏️ Editar" : "➕ Novo"} ${modalFinanceiro === "salario" ? "💵 salário" : "📤 gasto"}`}
+        descricao={`Registre ${modalFinanceiro === "salario" ? "o salário" : "um gasto"} de ${nomePessoaFinanceira(abaFinancas)}.`}
+        fechar={() => { setModalFinanceiro(null); setLancamentoEditando(null); }}
+      />
+      <form onSubmit={salvarLancamentoFinanceiro}>
+        <Campo label="Descrição" value={descricaoFinanceira} setValue={setDescricaoFinanceira} />
+        <Campo label="Valor" type="number" value={valorFinanceiro} setValue={setValorFinanceiro} />
+        <Campo label="Data" type="date" value={dataFinanceira} setValue={setDataFinanceira} />
+        <div className="mb-5">
+          <label className="block font-medium mb-2 text-slate-700">🏷️ Categoria</label>
+          <select value={categoriaFinanceira} onChange={(e) => setCategoriaFinanceira(e.target.value)} className="w-full text-base border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-emerald-300">
+            <option value="">Sem categoria</option>
+            {categoriasDaAbaFinanceira().map((categoria) => <option key={categoria.id} value={categoria.nome}>{categoria.emoji} {categoria.nome}</option>)}
+          </select>
+        </div>
+        <BotaoSalvar carregando={salvandoFinanceiro} texto={lancamentoEditando ? "Salvar alterações" : "Adicionar"} />
+      </form>
+    </Modal>
+  ) : null}
+
+  {modalFinanceiro === "divida" ? (
+    <Modal>
+      <CabecalhoModal
+        titulo={dividaEditando ? "✏️ Editar dívida" : "💳 Nova dívida"}
+        descricao="Defina o total, quantidade de parcelas e valor mensal. O calendário é criado automaticamente."
+        fechar={() => { setModalFinanceiro(null); setDividaEditando(null); }}
+      />
+      <form onSubmit={salvarDividaFinanceira}>
+        <Campo label="Nome da dívida" value={nomeDividaFinanceira} setValue={setNomeDividaFinanceira} />
+        <Campo label="Valor total" type="number" value={valorTotalDivida} setValue={(v) => {
+          setValorTotalDivida(v);
+          if (Number(parcelasDivida) > 0 && !dividaEditando) setValorParcelaDivida((Number(v) / Number(parcelasDivida)).toFixed(2));
+        }} />
+        <Campo label="Quantidade de parcelas" type="number" value={parcelasDivida} setValue={(v) => {
+          setParcelasDivida(v);
+          if (Number(v) > 0 && Number(valorTotalDivida) > 0 && !dividaEditando) setValorParcelaDivida((Number(valorTotalDivida) / Number(v)).toFixed(2));
+        }} />
+        <Campo label="💰 Valor mensal" type="number" value={valorParcelaDivida} setValue={setValorParcelaDivida} />
+        <Campo label="📅 Primeira parcela" type="date" value={dataPrimeiraDivida} setValue={setDataPrimeiraDivida} />
+        <div className="mb-5">
+          <label className="block font-medium mb-2 text-slate-700">🏷️ Categoria</label>
+          <select value={categoriaDivida} onChange={(e) => setCategoriaDivida(e.target.value)} className="w-full text-base border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-pink-300">
+            <option value="">Sem categoria</option>
+            {categoriasDaAbaFinanceira().map((categoria) => <option key={categoria.id} value={categoria.nome}>{categoria.emoji} {categoria.nome}</option>)}
+          </select>
+        </div>
+        <BotaoSalvar carregando={salvandoFinanceiro} texto={dividaEditando ? "Salvar dívida" : "Criar dívida"} />
+      </form>
+    </Modal>
+  ) : null}
+
+  {modalFinanceiro === "categoria" ? (
+    <Modal>
+      <CabecalhoModal
+        titulo={categoriaEditando ? "✏️ Editar categoria" : "🏷️ Nova categoria"}
+        descricao="Escolha um nome e um emoji para organizar suas finanças."
+        fechar={() => { setModalFinanceiro(null); setCategoriaEditando(null); }}
+      />
+      <form onSubmit={salvarCategoriaFinanceira}>
+        <Campo label="Nome da categoria" value={nomeCategoriaFinanceira} setValue={setNomeCategoriaFinanceira} />
+        <div className="mb-5">
+          <label className="block font-medium mb-2 text-slate-700">Emoji</label>
+          <div className="grid grid-cols-8 gap-2">
+            {EMOJIS_FINANCEIROS.map((emoji) => (
+              <button key={emoji} type="button" onClick={() => setEmojiCategoriaFinanceira(emoji)} className={`h-10 rounded-xl border text-xl ${emojiCategoriaFinanceira === emoji ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200 bg-white"}`}>{emoji}</button>
+            ))}
+          </div>
+        </div>
+        <BotaoSalvar carregando={false} texto={categoriaEditando ? "Salvar categoria" : "Criar categoria"} />
+      </form>
+    </Modal>
+  ) : null}
+
+  {parcelaEditando && (
+    <Modal>
+      <CabecalhoModal titulo="✏️ Editar parcela" descricao="Altere somente o valor desta parcela." fechar={() => setParcelaEditando(null)} />
+      <form onSubmit={salvarValorParcelaFinanceira}>
+        <Campo label={`Parcela ${parcelaEditando.numero}`} type="number" value={valorParcelaEdicao} setValue={setValorParcelaEdicao} />
+        <BotaoSalvar carregando={false} texto="Salvar valor" />
+      </form>
+    </Modal>
+  )}
 
   {/* MODAL NOSSA AGENDA */}
 
@@ -4609,6 +5430,29 @@ return ( <button
 );
 }
 
+function ResumoFinanceiroCard({
+  titulo,
+  valor,
+  icone,
+}: {
+  titulo: string;
+  valor: string;
+  icone: string;
+}) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm">
+      <div className="flex items-center gap-3">
+        <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center text-xl">{icone}</div>
+        <div className="min-w-0">
+          <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">{titulo}</p>
+          <p className="text-lg sm:text-xl font-bold text-slate-800 mt-1 break-words">{valor}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================= */
 /* ================================================= */
 /* CARD RESUMO */
 /* ================================================= */
