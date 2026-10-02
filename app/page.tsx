@@ -766,7 +766,13 @@ try {
       }
     }
 
-    setCategoriasFinanceiras(categoriasCompletas);
+    // Mantém somente uma categoria por pessoa + nome, mesmo se o banco já tiver duplicatas.
+    const categoriasUnicas = new Map<string, FinanceiroCategoria>();
+    for (const categoria of categoriasCompletas) {
+      const chave = `${categoria.pessoa}:${categoria.nome.trim().toLowerCase()}`;
+      if (!categoriasUnicas.has(chave)) categoriasUnicas.set(chave, categoria as FinanceiroCategoria);
+    }
+    setCategoriasFinanceiras(Array.from(categoriasUnicas.values()));
   }
 
   if (!respostaDividasFinanceiras.error) {
@@ -1609,8 +1615,24 @@ function nomePessoaFinanceira(pessoa: string) {
 }
 
 function categoriasDaAbaFinanceira() {
-  return categoriasFinanceiras.filter(
-    (categoria) => categoria.pessoa === abaFinancas || categoria.pessoa === "casal"
+  // Cada aba mostra somente as categorias daquela pessoa.
+  // Antes, Júlia/Paulo também recebiam as categorias do Casal,
+  // fazendo cada categoria aparecer duas vezes.
+  const categorias = categoriasFinanceiras.filter(
+    (categoria) => categoria.pessoa === abaFinancas
+  );
+
+  // Segurança extra: se o banco tiver duplicatas, mostra apenas uma.
+  const unicas = new Map<string, FinanceiroCategoria>();
+  for (const categoria of categorias) {
+    const chave = categoria.nome.trim().toLowerCase();
+    if (!unicas.has(chave)) {
+      unicas.set(chave, categoria);
+    }
+  }
+
+  return Array.from(unicas.values()).sort((a, b) =>
+    a.nome.localeCompare(b.nome, "pt-BR")
   );
 }
 
@@ -1833,7 +1855,9 @@ async function salvarDividaFinanceira(evento: FormEvent) {
       .insert(parcelas);
 
     if (erroParcelas) {
-      setErro(erroParcelas.message);
+      // Não deixa uma dívida sem parcelas caso a criação das parcelas falhe.
+      await supabase.from("financas_dividas").delete().eq("id", novaDivida.id);
+      setErro(`A dívida não foi registrada porque as parcelas não puderam ser criadas: ${erroParcelas.message}`);
       setSalvandoFinanceiro(false);
       return;
     }
