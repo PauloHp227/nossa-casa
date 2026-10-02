@@ -150,13 +150,23 @@ const formatarTemaEnxoval = (tema: string) =>
 
 const CATEGORIAS_FINANCEIRAS_PADRAO = [
   { nome: "Casa", emoji: "🏠" },
+  { nome: "Conta de luz", emoji: "💡" },
+  { nome: "Conta de água", emoji: "💧" },
+  { nome: "Gás", emoji: "🔥" },
+  { nome: "Internet", emoji: "📶" },
+  { nome: "Telefone", emoji: "📱" },
+  { nome: "Aluguel", emoji: "🏡" },
   { nome: "Alimentação", emoji: "🍔" },
+  { nome: "Mercado", emoji: "🛒" },
   { nome: "Transporte", emoji: "🚗" },
+  { nome: "Combustível", emoji: "⛽" },
   { nome: "Cartão", emoji: "💳" },
   { nome: "Lazer", emoji: "🎮" },
   { nome: "Estudos", emoji: "📚" },
   { nome: "Viagem", emoji: "✈️" },
   { nome: "Saúde", emoji: "❤️" },
+  { nome: "Assinaturas", emoji: "📺" },
+  { nome: "Presentes", emoji: "🎁" },
   { nome: "Outros", emoji: "📦" },
 ];
 
@@ -730,7 +740,33 @@ try {
   }
 
   if (!respostaCategoriasFinanceiras.error) {
-    setCategoriasFinanceiras(respostaCategoriasFinanceiras.data || []);
+    const categoriasExistentes = respostaCategoriasFinanceiras.data || [];
+    const novasCategorias: Array<{ pessoa: string; nome: string; emoji: string }> = [];
+
+    for (const pessoa of ["casal", "julia", "paulo"]) {
+      for (const categoria of CATEGORIAS_FINANCEIRAS_PADRAO) {
+        const existe = categoriasExistentes.some(
+          (item) => item.pessoa === pessoa && item.nome.toLowerCase() === categoria.nome.toLowerCase()
+        );
+        if (!existe) {
+          novasCategorias.push({ pessoa, ...categoria });
+        }
+      }
+    }
+
+    let categoriasCompletas = categoriasExistentes;
+    if (novasCategorias.length > 0) {
+      const respostaNovasCategorias = await supabase
+        .from("financas_categorias")
+        .insert(novasCategorias)
+        .select("*");
+
+      if (!respostaNovasCategorias.error) {
+        categoriasCompletas = [...categoriasExistentes, ...(respostaNovasCategorias.data || [])];
+      }
+    }
+
+    setCategoriasFinanceiras(categoriasCompletas);
   }
 
   if (!respostaDividasFinanceiras.error) {
@@ -1629,14 +1665,35 @@ async function salvarLancamentoFinanceiro(evento: FormEvent) {
     categoria: categoriaFinanceira || null,
   };
 
-  const resposta = lancamentoEditando
-    ? await supabase.from("financas_lancamentos").update(dados).eq("id", lancamentoEditando.id)
-    : await supabase.from("financas_lancamentos").insert(dados);
+  let resposta;
 
-  if (resposta.error) {
-    setErro(resposta.error.message);
+  if (lancamentoEditando) {
+    resposta = await supabase
+      .from("financas_lancamentos")
+      .update(dados)
+      .eq("id", lancamentoEditando.id)
+      .select("*")
+      .single();
+  } else {
+    resposta = await supabase
+      .from("financas_lancamentos")
+      .insert(dados)
+      .select("*")
+      .single();
+  }
+
+  if (resposta.error || !resposta.data) {
+    setErro(resposta.error?.message || "Não foi possível salvar o lançamento financeiro.");
     setSalvandoFinanceiro(false);
     return;
+  }
+
+  if (lancamentoEditando) {
+    setLancamentosFinanceiros((atuais) =>
+      atuais.map((item) => item.id === lancamentoEditando.id ? resposta.data as FinanceiroLancamento : item)
+    );
+  } else {
+    setLancamentosFinanceiros((atuais) => [resposta.data as FinanceiroLancamento, ...atuais]);
   }
 
   setModalFinanceiro(null);
@@ -1872,13 +1929,34 @@ async function salvarCategoriaFinanceira(evento: FormEvent) {
     emoji: emojiCategoriaFinanceira || "📦",
   };
 
-  const resposta = categoriaEditando
-    ? await supabase.from("financas_categorias").update(dados).eq("id", categoriaEditando.id)
-    : await supabase.from("financas_categorias").insert(dados);
+  let resposta;
 
-  if (resposta.error) {
-    setErro(resposta.error.message);
+  if (categoriaEditando) {
+    resposta = await supabase
+      .from("financas_categorias")
+      .update(dados)
+      .eq("id", categoriaEditando.id)
+      .select("*")
+      .single();
+  } else {
+    resposta = await supabase
+      .from("financas_categorias")
+      .insert(dados)
+      .select("*")
+      .single();
+  }
+
+  if (resposta.error || !resposta.data) {
+    setErro(resposta.error?.message || "Não foi possível salvar a categoria.");
     return;
+  }
+
+  if (categoriaEditando) {
+    setCategoriasFinanceiras((atuais) =>
+      atuais.map((item) => item.id === categoriaEditando.id ? resposta.data as FinanceiroCategoria : item)
+    );
+  } else {
+    setCategoriasFinanceiras((atuais) => [resposta.data as FinanceiroCategoria, ...atuais]);
   }
 
   setModalFinanceiro(null);
