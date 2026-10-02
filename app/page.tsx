@@ -3272,7 +3272,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                 ).length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center">
                     <div className="text-4xl">📅</div>
-                    <p className="font-semibold text-slate-700 mt-3>
+                    <p className="font-semibold text-slate-700 mt-3">
                       Nenhuma programação neste mês.
                     </p>
                     <p className="text-sm text-slate-500 mt-1">
