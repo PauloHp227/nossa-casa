@@ -480,7 +480,7 @@ const [parcelasFinanceiras, setParcelasFinanceiras] = useState<ParcelaFinanceira
 const [mesFinanceiro, setMesFinanceiro] = useState(new Date().getMonth());
 const [anoFinanceiro, setAnoFinanceiro] = useState(new Date().getFullYear());
 
-const [modalFinanceiro, setModalFinanceiro] = useState<"salario" | "gasto" | "divida" | "categoria" | null>(null);
+const [modalFinanceiro, setModalFinanceiro] = useState<"salario" | "ganho_adicional" | "gasto" | "divida" | "categoria" | null>(null);
 const [lancamentoEditando, setLancamentoEditando] = useState<FinanceiroLancamento | null>(null);
 const [dividaEditando, setDividaEditando] = useState<DividaFinanceira | null>(null);
 const [categoriaEditando, setCategoriaEditando] = useState<FinanceiroCategoria | null>(null);
@@ -1649,7 +1649,7 @@ function parcelasDaAbaFinanceira() {
   return parcelasFinanceiras.filter((parcela) => ids.has(parcela.divida_id));
 }
 
-function abrirNovoLancamentoFinanceiro(tipo: "salario" | "gasto") {
+function abrirNovoLancamentoFinanceiro(tipo: "salario" | "ganho_adicional" | "gasto") {
   setLancamentoEditando(null);
   setDescricaoFinanceira("");
   setValorFinanceiro("");
@@ -1680,7 +1680,7 @@ async function salvarLancamentoFinanceiro(evento: FormEvent) {
 
   const dados = {
     pessoa: pessoaFinanceiraAtual(),
-    tipo: modalFinanceiro === "salario" ? "salario" : "gasto",
+    tipo: modalFinanceiro === "salario" ? "salario" : modalFinanceiro === "ganho_adicional" ? "ganho_adicional" : "gasto",
     descricao: descricaoFinanceira.trim(),
     valor: Number(valorFinanceiro),
     data: dataFinanceira,
@@ -1723,7 +1723,7 @@ async function salvarLancamentoFinanceiro(evento: FormEvent) {
   setSalvandoFinanceiro(false);
 
   await registrarNotificacao(
-    modalFinanceiro === "salario" ? "Salário atualizado" : "Gasto registrado",
+    modalFinanceiro === "salario" ? "Salário atualizado" : modalFinanceiro === "ganho_adicional" ? "Ganho adicional registrado" : "Gasto registrado",
     `${dados.descricao}: ${formatarMoeda(dados.valor)}.`,
     "financeiro"
   );
