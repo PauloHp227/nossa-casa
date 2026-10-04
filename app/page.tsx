@@ -3477,13 +3477,9 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
               ) : (
                 [...planejamentos]
                   .sort((a, b) => {
-                    const agora = new Date();
-                    const referencia = agora.getFullYear() * 12 + agora.getMonth() + 1;
                     const indiceA = a.ano * 12 + a.mes;
                     const indiceB = b.ano * 12 + b.mes;
-                    const distanciaA = indiceA >= referencia ? indiceA - referencia : 100000 + (referencia - indiceA);
-                    const distanciaB = indiceB >= referencia ? indiceB - referencia : 100000 + (referencia - indiceB);
-                    return distanciaA - distanciaB;
+                    return indiceA - indiceB;
                   })
                   .map(
                     (
@@ -3756,6 +3752,11 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
               const dividas = dividasDaAbaFinanceira();
               const parcelas = parcelasDaAbaFinanceira();
               const mesAtual = `${anoFinanceiro}-${String(mesFinanceiro + 1).padStart(2, "0")}`;
+              // Lançamentos comuns ficam restritos ao mês selecionado.
+              // Dívidas e parcelas continuam persistindo conforme seus vencimentos.
+              const lancamentosDoMes = lancamentos.filter((item) =>
+                item.data.startsWith(mesAtual)
+              );
               const salariosMes = lancamentos
                 .filter((item) => item.tipo === "salario" && item.data.startsWith(mesAtual))
                 .reduce((soma, item) => soma + Number(item.valor || 0), 0);
@@ -3890,15 +3891,15 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                     <button type="button" onClick={() => setLancamentosFinanceirosAbertos((aberto) => !aberto)} className="w-full p-5 sm:p-6 flex items-center justify-between gap-3 text-left hover:bg-slate-50 transition">
                       <div>
                         <h3 className="text-xl font-bold">📊 Lançamentos de {nomePessoaFinanceira(pessoa)}</h3>
-                        <p className="text-sm text-slate-500 mt-1">{lancamentos.length} lançamento(s) • clique para {lancamentosFinanceirosAbertos ? "recolher" : "ver a lista"}.</p>
+                        <p className="text-sm text-slate-500 mt-1">{lancamentosDoMes.length} lançamento(s) em {nomeDoMes(mesFinanceiro + 1)} • clique para {lancamentosFinanceirosAbertos ? "recolher" : "ver a lista"}.</p>
                       </div>
                       <span className="text-2xl text-slate-400">{lancamentosFinanceirosAbertos ? "⌃" : "⌄"}</span>
                     </button>
                     {lancamentosFinanceirosAbertos && (
                       <div className="border-t border-slate-100 divide-y divide-slate-100">
-                        {lancamentos.length === 0 ? (
-                          <div className="p-8 text-center text-slate-500">Nenhum lançamento cadastrado.</div>
-                        ) : lancamentos.slice(0, 30).map((item) => (
+                        {lancamentosDoMes.length === 0 ? (
+                          <div className="p-8 text-center text-slate-500">Nenhum lançamento cadastrado neste mês.</div>
+                        ) : lancamentosDoMes.slice(0, 30).map((item) => (
                           <div key={item.id} className="p-4 flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl">{item.tipo === "salario" ? "💵" : item.tipo === "ganho_adicional" ? "➕" : "📤"}</div>
                             <div className="min-w-0 flex-1">
