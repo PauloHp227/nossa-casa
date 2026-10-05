@@ -97,6 +97,7 @@ numero: number;
 valor: number;
 vencimento: string;
 paga: boolean;
+descontada: boolean;
 data_pagamento: string | null;
 };
 
@@ -1875,6 +1876,7 @@ async function salvarDividaFinanceira(evento: FormEvent) {
         : valorParcela,
       vencimento: adicionarMeses(dataPrimeiraDivida, index),
       paga: false,
+      descontada: false,
       data_pagamento: null,
     }));
 
@@ -1912,6 +1914,21 @@ async function excluirDividaFinanceira(divida: DividaFinanceira) {
     setErro(error.message);
     return;
   }
+  await buscarDados();
+}
+
+async function alternarDescontoParcelaFinanceira(parcela: ParcelaFinanceira) {
+  const novaDescontada = !parcela.descontada;
+  const { error } = await supabase
+    .from("financas_parcelas")
+    .update({ descontada: novaDescontada })
+    .eq("id", parcela.id);
+
+  if (error) {
+    setErro(error.message);
+    return;
+  }
+
   await buscarDados();
 }
 
@@ -3767,7 +3784,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                 .filter((item) => item.tipo === "gasto" && item.data.startsWith(mesAtual))
                 .reduce((soma, item) => soma + Number(item.valor || 0), 0);
               const parcelasMes = parcelas
-                .filter((parcela) => !parcela.paga && parcela.vencimento.startsWith(mesAtual))
+                .filter((parcela) => parcela.descontada && parcela.vencimento.startsWith(mesAtual))
                 .reduce((soma, parcela) => soma + Number(parcela.valor || 0), 0);
               const disponivel = salariosMes + ganhosAdicionaisMes - gastosMes - parcelasMes;
               const parcelasPendentes = parcelas.filter((parcela) => !parcela.paga);
@@ -3873,9 +3890,11 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                               <div className="mt-3 space-y-1">
                                 {parcelasDaDivida.slice(0, 12).map((parcela) => (
                                   <div key={parcela.id} className="flex items-center gap-2">
-                                    <button type="button" onClick={() => alternarParcelaFinanceira(parcela)} className={`flex-1 text-left text-xs px-2 py-1.5 rounded-lg ${parcela.paga ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-600"}`}>
-                                      {parcela.paga ? "☑" : "☐"} {parcela.numero}/{divida.parcelas_total} — {formatarMoeda(parcela.valor)} — {formatarDataCurta(parcela.vencimento)}
+                                    <button type="button" onClick={() => alternarDescontoParcelaFinanceira(parcela)} className={`flex-1 text-left text-xs px-3 py-2 rounded-lg border transition ${parcela.descontada ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                                      <div className="font-semibold">{parcela.descontada ? "☑ Descontada do mês" : "☐ Não descontada"}</div>
+                                      <div className="mt-0.5">{parcela.numero}/{divida.parcelas_total} — {formatarMoeda(parcela.valor)} — {formatarDataCurta(parcela.vencimento)}</div>
                                     </button>
+                                    <button type="button" onClick={() => alternarParcelaFinanceira(parcela)} className={`shrink-0 px-2 py-1.5 rounded-lg text-[11px] font-semibold ${parcela.paga ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`} title="Marcar parcela como paga">{parcela.paga ? "✓ Paga" : "Marcar paga"}</button>
                                     <button type="button" onClick={() => abrirEdicaoParcelaFinanceira(parcela)} className="w-8 h-8 rounded-lg hover:bg-slate-100" title="Editar valor da parcela">✏️</button>
                                   </div>
                                 ))}
@@ -3901,7 +3920,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                           <div className="p-8 text-center text-slate-500">Nenhum lançamento cadastrado neste mês.</div>
                         ) : lancamentosDoMes.slice(0, 30).map((item) => (
                           <div key={item.id} className="p-4 flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl">{item.tipo === "salario" ? "💵" : item.tipo === "ganho_adicional" ? "➕" : "📤"}</div>
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl">{categorias.find((categoria) => categoria.nome.trim().toLowerCase() === (item.categoria || "").trim().toLowerCase())?.emoji || (item.tipo === "salario" ? "💵" : item.tipo === "ganho_adicional" ? "➕" : "📤")}</div>
                             <div className="min-w-0 flex-1">
                               <p className="font-semibold text-slate-800 truncate">{item.descricao}</p>
                               <p className="text-xs text-slate-500">{formatarDataCurta(item.data)} {item.categoria ? `• ${item.categoria}` : ""}</p>
