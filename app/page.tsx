@@ -504,7 +504,7 @@ const [valorFinanceiro, setValorFinanceiro] = useState("");
 const [dataFinanceira, setDataFinanceira] = useState(new Date().toISOString().split("T")[0]);
 const [categoriaFinanceira, setCategoriaFinanceira] = useState("");
 const [nomeCategoriaFinanceira, setNomeCategoriaFinanceira] = useState("");
-const [emojiCategoriaFinanceira, setEmojiCategoriaFinanceira] = useState("📦");
+const [emojiCategoriaFinanceiraSelecionada, setEmojiCategoriaFinanceiraSelecionada] = useState("📦");
 const [nomeDividaFinanceira, setNomeDividaFinanceira] = useState("");
 const [valorTotalDivida, setValorTotalDivida] = useState("");
 const [parcelasDivida, setParcelasDivida] = useState("1");
@@ -1658,7 +1658,7 @@ function dividasDaAbaFinanceira() {
   return dividasFinanceiras.filter((divida) => divida.pessoa === abaFinancas);
 }
 
-function emojiCategoriaFinanceira(categoria: string | null, fallback = "📦") {
+function emojiCategoriaFinanceira(categoria: string | null | undefined, fallback = "📦") {
   if (!categoria) return fallback;
   return categoriasFinanceiras.find(
     (item) =>
@@ -1988,7 +1988,7 @@ async function salvarCategoriaFinanceira(evento: FormEvent) {
   const dados = {
     pessoa: abaFinancas,
     nome: nomeCategoriaFinanceira.trim(),
-    emoji: emojiCategoriaFinanceira || "📦",
+    emoji: emojiCategoriaFinanceiraSelecionada || "📦",
   };
 
   let resposta;
@@ -2024,7 +2024,7 @@ async function salvarCategoriaFinanceira(evento: FormEvent) {
   setModalFinanceiro(null);
   setCategoriaEditando(null);
   setNomeCategoriaFinanceira("");
-  setEmojiCategoriaFinanceira("📦");
+  setEmojiCategoriaFinanceiraSelecionada("📦");
   await buscarDados();
 }
 
@@ -2046,14 +2046,14 @@ async function excluirCategoriaFinanceira(categoria: FinanceiroCategoria) {
 function abrirNovaCategoriaFinanceira() {
   setCategoriaEditando(null);
   setNomeCategoriaFinanceira("");
-  setEmojiCategoriaFinanceira("📦");
+  setEmojiCategoriaFinanceiraSelecionada("📦");
   setModalFinanceiro("categoria");
 }
 
 function abrirEdicaoCategoriaFinanceira(categoria: FinanceiroCategoria) {
   setCategoriaEditando(categoria);
   setNomeCategoriaFinanceira(categoria.nome);
-  setEmojiCategoriaFinanceira(categoria.emoji);
+  setEmojiCategoriaFinanceiraSelecionada(categoria.emoji);
   setModalFinanceiro("categoria");
 }
 
@@ -4577,7 +4577,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
           <label className="block font-medium mb-2 text-slate-700">Emoji</label>
           <div className="grid grid-cols-8 gap-2">
             {EMOJIS_FINANCEIROS.map((emoji) => (
-              <button key={emoji} type="button" onClick={() => setEmojiCategoriaFinanceira(emoji)} className={`h-10 rounded-xl border text-xl ${emojiCategoriaFinanceira === emoji ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200 bg-white"}`}>{emoji}</button>
+              <button key={emoji} type="button" onClick={() => setEmojiCategoriaFinanceiraSelecionada(emoji)} className={`h-10 rounded-xl border text-xl ${emojiCategoriaFinanceiraSelecionada === emoji ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200 bg-white"}`}>{emoji}</button>
             ))}
           </div>
         </div>
