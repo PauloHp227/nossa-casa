@@ -504,7 +504,7 @@ const [valorFinanceiro, setValorFinanceiro] = useState("");
 const [dataFinanceira, setDataFinanceira] = useState(new Date().toISOString().split("T")[0]);
 const [categoriaFinanceira, setCategoriaFinanceira] = useState("");
 const [nomeCategoriaFinanceira, setNomeCategoriaFinanceira] = useState("");
-const [emojiCategoriaFinanceiraSelecionada, setEmojiCategoriaFinanceiraSelecionada] = useState("📦");
+const [emojiCategoriaFinanceiraSelecionada, setEmojiCategoriaFinanceira] = useState("📦");
 const [nomeDividaFinanceira, setNomeDividaFinanceira] = useState("");
 const [valorTotalDivida, setValorTotalDivida] = useState("");
 const [parcelasDivida, setParcelasDivida] = useState("1");
@@ -2024,7 +2024,7 @@ async function salvarCategoriaFinanceira(evento: FormEvent) {
   setModalFinanceiro(null);
   setCategoriaEditando(null);
   setNomeCategoriaFinanceira("");
-  setEmojiCategoriaFinanceiraSelecionada("📦");
+  setEmojiCategoriaFinanceira("📦");
   await buscarDados();
 }
 
@@ -2046,14 +2046,14 @@ async function excluirCategoriaFinanceira(categoria: FinanceiroCategoria) {
 function abrirNovaCategoriaFinanceira() {
   setCategoriaEditando(null);
   setNomeCategoriaFinanceira("");
-  setEmojiCategoriaFinanceiraSelecionada("📦");
+  setEmojiCategoriaFinanceira("📦");
   setModalFinanceiro("categoria");
 }
 
 function abrirEdicaoCategoriaFinanceira(categoria: FinanceiroCategoria) {
   setCategoriaEditando(categoria);
   setNomeCategoriaFinanceira(categoria.nome);
-  setEmojiCategoriaFinanceiraSelecionada(categoria.emoji);
+  setEmojiCategoriaFinanceira(categoria.emoji);
   setModalFinanceiro("categoria");
 }
 
@@ -4577,7 +4577,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
           <label className="block font-medium mb-2 text-slate-700">Emoji</label>
           <div className="grid grid-cols-8 gap-2">
             {EMOJIS_FINANCEIROS.map((emoji) => (
-              <button key={emoji} type="button" onClick={() => setEmojiCategoriaFinanceiraSelecionada(emoji)} className={`h-10 rounded-xl border text-xl ${emojiCategoriaFinanceiraSelecionada === emoji ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200 bg-white"}`}>{emoji}</button>
+              <button key={emoji} type="button" onClick={() => setEmojiCategoriaFinanceira(emoji)} className={`h-10 rounded-xl border text-xl ${emojiCategoriaFinanceiraSelecionada === emoji ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200 bg-white"}`}>{emoji}</button>
             ))}
           </div>
         </div>
