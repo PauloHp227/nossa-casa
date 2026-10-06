@@ -1658,6 +1658,16 @@ function dividasDaAbaFinanceira() {
   return dividasFinanceiras.filter((divida) => divida.pessoa === abaFinancas);
 }
 
+function emojiCategoriaFinanceira(categoria: string | null, fallback = "📦") {
+  if (!categoria) return fallback;
+  return categoriasFinanceiras.find(
+    (item) =>
+      item.pessoa === abaFinancas &&
+      item.nome.trim().toLowerCase() === categoria.trim().toLowerCase()
+  )?.emoji || fallback;
+}
+
+
 function lancamentosDaAbaFinanceira() {
   return lancamentosFinanceiros.filter((item) => item.pessoa === abaFinancas);
 }
@@ -3829,10 +3839,10 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                                 <div className="mt-1 space-y-0.5 sm:space-y-1 min-w-0">
                                   {parcelasDia.slice(0, 2).map((parcela) => {
                                     const divida = dividasFinanceiras.find((item) => item.id === parcela.divida_id);
-                                    return <button type="button" key={parcela.id} onClick={() => alternarParcelaFinanceira(parcela)} className={`w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 ${parcela.paga ? "bg-emerald-100 text-emerald-700 line-through" : "bg-pink-50 text-pink-700"}`}><span className="block truncate">💳 {divida?.nome || "Parcela"}</span><span className="block truncate">{formatarMoeda(parcela.valor)}</span></button>;
+                                    return <button type="button" key={parcela.id} onClick={() => alternarParcelaFinanceira(parcela)} className={`w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 ${parcela.paga ? "bg-emerald-100 text-emerald-700 line-through" : "bg-pink-50 text-pink-700"}`}><span className="block truncate">{emojiCategoriaFinanceira(divida?.categoria, "💳")} {divida?.nome || "Parcela"}</span><span className="block truncate">{formatarMoeda(parcela.valor)}</span></button>;
                                   })}
-                                  {gastosDia.slice(0, 1).map((gasto) => <button type="button" key={gasto.id} onClick={() => abrirEdicaoLancamentoFinanceiro(gasto)} className="w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 bg-slate-100 text-slate-700 truncate">📤 {formatarMoeda(gasto.valor)}</button>)}
-                                  {ganhosDia.slice(0, 1).map((ganho) => <button type="button" key={ganho.id} onClick={() => abrirEdicaoLancamentoFinanceiro(ganho)} className="w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 bg-blue-50 text-blue-700 truncate">➕ {formatarMoeda(ganho.valor)}</button>)}
+                                  {gastosDia.slice(0, 1).map((gasto) => <button type="button" key={gasto.id} onClick={() => abrirEdicaoLancamentoFinanceiro(gasto)} className="w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 bg-slate-100 text-slate-700 truncate">{emojiCategoriaFinanceira(gasto.categoria, "📤")} {formatarMoeda(gasto.valor)}</button>)}
+                                  {ganhosDia.slice(0, 1).map((ganho) => <button type="button" key={ganho.id} onClick={() => abrirEdicaoLancamentoFinanceiro(ganho)} className="w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 bg-blue-50 text-blue-700 truncate">{emojiCategoriaFinanceira(ganho.categoria, "➕")} {formatarMoeda(ganho.valor)}</button>)}
                                 </div>
                               </div>
                             );
@@ -3901,7 +3911,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                           <div className="p-8 text-center text-slate-500">Nenhum lançamento cadastrado neste mês.</div>
                         ) : lancamentosDoMes.slice(0, 30).map((item) => (
                           <div key={item.id} className="p-4 flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl">{item.tipo === "salario" ? "💵" : item.tipo === "ganho_adicional" ? "➕" : "📤"}</div>
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl">{emojiCategoriaFinanceira(item.categoria, item.tipo === "salario" ? "💵" : item.tipo === "ganho_adicional" ? "➕" : "📤")}</div>
                             <div className="min-w-0 flex-1">
                               <p className="font-semibold text-slate-800 truncate">{item.descricao}</p>
                               <p className="text-xs text-slate-500">{formatarDataCurta(item.data)} {item.categoria ? `• ${item.categoria}` : ""}</p>
