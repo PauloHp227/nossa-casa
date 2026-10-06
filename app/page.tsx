@@ -504,7 +504,7 @@ const [valorFinanceiro, setValorFinanceiro] = useState("");
 const [dataFinanceira, setDataFinanceira] = useState(new Date().toISOString().split("T")[0]);
 const [categoriaFinanceira, setCategoriaFinanceira] = useState("");
 const [nomeCategoriaFinanceira, setNomeCategoriaFinanceira] = useState("");
-const [emojiCategoriaFinanceiraSelecionada, setEmojiCategoriaFinanceira] = useState("📦");
+const [emojiCategoriaFinanceiraSelecionada, setEmojiCategoriaFinanceiraSelecionada] = useState("📦");
 const [nomeDividaFinanceira, setNomeDividaFinanceira] = useState("");
 const [valorTotalDivida, setValorTotalDivida] = useState("");
 const [parcelasDivida, setParcelasDivida] = useState("1");
@@ -516,6 +516,7 @@ const [parcelaEditando, setParcelaEditando] = useState<ParcelaFinanceira | null>
 const [valorParcelaEdicao, setValorParcelaEdicao] = useState("");
 const [lancamentosFinanceirosAbertos, setLancamentosFinanceirosAbertos] = useState(false);
 const [categoriasFinanceirasAbertas, setCategoriasFinanceirasAbertas] = useState(false);
+  const [parcelaFinanceiraParaQuitar, setParcelaFinanceiraParaQuitar] = useState<ParcelaFinanceira | null>(null);
 const [modoValorDivida, setModoValorDivida] = useState<"total" | "mensal">("total");
 
 /* EXCLUIR ITEM */
@@ -2024,7 +2025,7 @@ async function salvarCategoriaFinanceira(evento: FormEvent) {
   setModalFinanceiro(null);
   setCategoriaEditando(null);
   setNomeCategoriaFinanceira("");
-  setEmojiCategoriaFinanceira("📦");
+  setEmojiCategoriaFinanceiraSelecionada("📦");
   await buscarDados();
 }
 
@@ -2046,14 +2047,14 @@ async function excluirCategoriaFinanceira(categoria: FinanceiroCategoria) {
 function abrirNovaCategoriaFinanceira() {
   setCategoriaEditando(null);
   setNomeCategoriaFinanceira("");
-  setEmojiCategoriaFinanceira("📦");
+  setEmojiCategoriaFinanceiraSelecionada("📦");
   setModalFinanceiro("categoria");
 }
 
 function abrirEdicaoCategoriaFinanceira(categoria: FinanceiroCategoria) {
   setCategoriaEditando(categoria);
   setNomeCategoriaFinanceira(categoria.nome);
-  setEmojiCategoriaFinanceira(categoria.emoji);
+  setEmojiCategoriaFinanceiraSelecionada(categoria.emoji);
   setModalFinanceiro("categoria");
 }
 
@@ -3762,6 +3763,28 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
               const dividas = dividasDaAbaFinanceira();
               const parcelas = parcelasDaAbaFinanceira();
               const mesAtual = `${anoFinanceiro}-${String(mesFinanceiro + 1).padStart(2, "0")}`;
+
+              // Dívidas continuam com o mesmo visual de antes.
+              // Quando uma dívida é quitada, ela permanece visível no mês da quitação
+              // e desaparece a partir do mês seguinte. Nada é apagado do banco.
+              const dividasVisiveis = dividas.filter((divida) => {
+                const parcelasDaDivida = parcelas.filter((parcela) => parcela.divida_id === divida.id);
+                const quitada = parcelasDaDivida.filter((parcela) => parcela.paga).length >= divida.parcelas_total;
+
+                if (!quitada) return true;
+
+                const datasPagamento = parcelasDaDivida
+                  .map((parcela) => parcela.data_pagamento)
+                  .filter((data): data is string => Boolean(data))
+                  .sort();
+
+                const ultimaDataPagamento = datasPagamento[datasPagamento.length - 1];
+                if (!ultimaDataPagamento) return true;
+
+                const mesQuitacao = ultimaDataPagamento.slice(0, 7);
+                return mesAtual <= mesQuitacao;
+              });
+
               // Lançamentos comuns ficam restritos ao mês selecionado.
               // Dívidas e parcelas continuam persistindo conforme seus vencimentos.
               const lancamentosDoMes = lancamentos.filter((item) =>
@@ -3839,7 +3862,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                                 <div className="mt-1 space-y-0.5 sm:space-y-1 min-w-0">
                                   {parcelasDia.slice(0, 2).map((parcela) => {
                                     const divida = dividasFinanceiras.find((item) => item.id === parcela.divida_id);
-                                    return <button type="button" key={parcela.id} onClick={() => alternarParcelaFinanceira(parcela)} className={`w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 ${parcela.paga ? "bg-emerald-100 text-emerald-700 line-through" : "bg-pink-50 text-pink-700"}`}><span className="block truncate">{emojiCategoriaFinanceira(divida?.categoria, "💳")} {divida?.nome || "Parcela"}</span><span className="block truncate">{formatarMoeda(parcela.valor)}</span></button>;
+                                    return <button type="button" key={parcela.id} onClick={() => setParcelaFinanceiraParaQuitar(parcela)} className={`w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 ${parcela.paga ? "bg-emerald-100 text-emerald-700 line-through" : "bg-pink-50 text-pink-700"}`}><span className="block truncate">{emojiCategoriaFinanceira(divida?.categoria, "💳")} {divida?.nome || "Parcela"}</span><span className="block truncate">{formatarMoeda(parcela.valor)}</span></button>;
                                   })}
                                   {gastosDia.slice(0, 1).map((gasto) => <button type="button" key={gasto.id} onClick={() => abrirEdicaoLancamentoFinanceiro(gasto)} className="w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 bg-slate-100 text-slate-700 truncate">{emojiCategoriaFinanceira(gasto.categoria, "📤")} {formatarMoeda(gasto.valor)}</button>)}
                                   {ganhosDia.slice(0, 1).map((ganho) => <button type="button" key={ganho.id} onClick={() => abrirEdicaoLancamentoFinanceiro(ganho)} className="w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 bg-blue-50 text-blue-700 truncate">{emojiCategoriaFinanceira(ganho.categoria, "➕")} {formatarMoeda(ganho.valor)}</button>)}
@@ -3854,12 +3877,12 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                     <section className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
                       <div className="p-5 border-b border-slate-100">
                         <h3 className="text-xl font-bold">💳 Dívidas</h3>
-                        <p className="text-sm text-slate-500 mt-1">{dividas.filter((d) => d.status !== "quitada").length} em andamento • {dividas.filter((d) => d.status === "quitada").length} quitada(s)</p>
+                        <p className="text-sm text-slate-500 mt-1">{dividasVisiveis.filter((d) => d.status !== "quitada").length} em andamento • {dividasVisiveis.filter((d) => d.status === "quitada").length} quitada(s)</p>
                       </div>
                       <div className="p-4 space-y-3 max-h-[520px] overflow-y-auto">
-                        {dividas.length === 0 ? (
+                        {dividasVisiveis.length === 0 ? (
                           <div className="py-10 text-center text-slate-500">Nenhuma dívida cadastrada.</div>
-                        ) : dividas.map((divida) => {
+                        ) : dividasVisiveis.map((divida) => {
                           const parcelasDaDivida = parcelas.filter((p) => p.divida_id === divida.id);
                           const pagas = parcelasDaDivida.filter((p) => p.paga).length;
                           const quitada = pagas >= divida.parcelas_total;
@@ -4577,7 +4600,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
           <label className="block font-medium mb-2 text-slate-700">Emoji</label>
           <div className="grid grid-cols-8 gap-2">
             {EMOJIS_FINANCEIROS.map((emoji) => (
-              <button key={emoji} type="button" onClick={() => setEmojiCategoriaFinanceira(emoji)} className={`h-10 rounded-xl border text-xl ${emojiCategoriaFinanceiraSelecionada === emoji ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200 bg-white"}`}>{emoji}</button>
+              <button key={emoji} type="button" onClick={() => setEmojiCategoriaFinanceiraSelecionada(emoji)} className={`h-10 rounded-xl border text-xl ${emojiCategoriaFinanceiraSelecionada === emoji ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200 bg-white"}`}>{emoji}</button>
             ))}
           </div>
         </div>
@@ -5416,7 +5439,31 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
 
 </div>
 
-</main>
+
+
+        {parcelaFinanceiraParaQuitar && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
+              <h3 className="text-lg font-bold text-slate-800">Quitar parcela?</h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Deseja quitar a parcela {parcelaFinanceiraParaQuitar.numero} no valor de{" "}
+                <strong>{formatarMoeda(parcelaFinanceiraParaQuitar.valor)}</strong>?
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button type="button" onClick={() => setParcelaFinanceiraParaQuitar(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50">
+                  Cancelar
+                </button>
+                <button type="button" onClick={async () => {
+                  const parcela = parcelaFinanceiraParaQuitar;
+                  setParcelaFinanceiraParaQuitar(null);
+                  await alternarParcelaFinanceira(parcela);
+                }} className="px-4 py-2 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600">
+                  Sim, quitar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}</main>
 
 );
 }
