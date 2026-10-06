@@ -97,7 +97,6 @@ numero: number;
 valor: number;
 vencimento: string;
 paga: boolean;
-descontada: boolean;
 data_pagamento: string | null;
 };
 
@@ -1876,7 +1875,6 @@ async function salvarDividaFinanceira(evento: FormEvent) {
         : valorParcela,
       vencimento: adicionarMeses(dataPrimeiraDivida, index),
       paga: false,
-      descontada: false,
       data_pagamento: null,
     }));
 
@@ -1914,21 +1912,6 @@ async function excluirDividaFinanceira(divida: DividaFinanceira) {
     setErro(error.message);
     return;
   }
-  await buscarDados();
-}
-
-async function alternarDescontoParcelaFinanceira(parcela: ParcelaFinanceira) {
-  const novaDescontada = !parcela.descontada;
-  const { error } = await supabase
-    .from("financas_parcelas")
-    .update({ descontada: novaDescontada })
-    .eq("id", parcela.id);
-
-  if (error) {
-    setErro(error.message);
-    return;
-  }
-
   await buscarDados();
 }
 
@@ -3784,7 +3767,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                 .filter((item) => item.tipo === "gasto" && item.data.startsWith(mesAtual))
                 .reduce((soma, item) => soma + Number(item.valor || 0), 0);
               const parcelasMes = parcelas
-                .filter((parcela) => parcela.descontada && parcela.vencimento.startsWith(mesAtual))
+                .filter((parcela) => !parcela.paga && parcela.vencimento.startsWith(mesAtual))
                 .reduce((soma, parcela) => soma + Number(parcela.valor || 0), 0);
               const disponivel = salariosMes + ganhosAdicionaisMes - gastosMes - parcelasMes;
               const parcelasPendentes = parcelas.filter((parcela) => !parcela.paga);
@@ -3827,12 +3810,12 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                         </div>
                       </div>
 
-                      <div className="p-3 sm:p-5">
-                        <div className="grid grid-cols-7 text-center text-xs font-semibold text-slate-400 mb-2">
-                          {["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"].map((dia) => <div key={dia} className="py-2">{dia}</div>)}
+                      <div className="p-2 sm:p-5">
+                        <div className="grid grid-cols-7 text-center text-[10px] sm:text-xs font-semibold text-slate-400 mb-1 sm:mb-2">
+                          {["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"].map((dia) => <div key={dia} className="py-1.5 sm:py-2">{dia}</div>)}
                         </div>
-                        <div className="grid grid-cols-7 gap-1">
-                          {Array.from({ length: primeiroDiaSemana }).map((_, index) => <div key={`vazio-${index}`} className="min-h-20 sm:min-h-24" />)}
+                        <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                          {Array.from({ length: primeiroDiaSemana }).map((_, index) => <div key={`vazio-${index}`} className="min-h-[64px] sm:min-h-24" />)}
                           {Array.from({ length: diasNoMes }, (_, index) => {
                             const dia = index + 1;
                             const dataDia = `${anoFinanceiro}-${String(mesFinanceiro + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
@@ -3841,15 +3824,15 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                             const ganhosDia = ganhosAdicionaisDoMes.filter((item) => item.data === dataDia);
                             const hoje = dataLocalString() === dataDia;
                             return (
-                              <div key={dataDia} className={`min-h-20 sm:min-h-24 border rounded-xl p-1.5 sm:p-2 ${hoje ? "border-emerald-400 bg-emerald-50/40" : "border-slate-100"}`}>
-                                <div className={`text-xs font-bold ${hoje ? "text-emerald-600" : "text-slate-500"}`}>{dia}</div>
-                                <div className="mt-1 space-y-1">
+                              <div key={dataDia} className={`min-h-[64px] sm:min-h-24 border rounded-lg sm:rounded-xl p-1 sm:p-2 overflow-hidden ${hoje ? "border-emerald-400 bg-emerald-50/40" : "border-slate-100"}`}>
+                                <div className={`text-[10px] sm:text-xs font-bold ${hoje ? "text-emerald-600" : "text-slate-500"}`}>{dia}</div>
+                                <div className="mt-1 space-y-0.5 sm:space-y-1 min-w-0">
                                   {parcelasDia.slice(0, 2).map((parcela) => {
                                     const divida = dividasFinanceiras.find((item) => item.id === parcela.divida_id);
-                                    return <button type="button" key={parcela.id} onClick={() => alternarParcelaFinanceira(parcela)} className={`w-full text-left text-[10px] sm:text-xs rounded-lg px-1.5 py-1 ${parcela.paga ? "bg-emerald-100 text-emerald-700 line-through" : "bg-pink-50 text-pink-700"}`}>💳 {divida?.nome || "Parcela"}<br />{formatarMoeda(parcela.valor)}</button>;
+                                    return <button type="button" key={parcela.id} onClick={() => alternarParcelaFinanceira(parcela)} className={`w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 ${parcela.paga ? "bg-emerald-100 text-emerald-700 line-through" : "bg-pink-50 text-pink-700"}`}><span className="block truncate">💳 {divida?.nome || "Parcela"}</span><span className="block truncate">{formatarMoeda(parcela.valor)}</span></button>;
                                   })}
-                                  {gastosDia.slice(0, 1).map((gasto) => <button type="button" key={gasto.id} onClick={() => abrirEdicaoLancamentoFinanceiro(gasto)} className="w-full text-left text-[10px] sm:text-xs rounded-lg px-1.5 py-1 bg-slate-100 text-slate-700">📤 {formatarMoeda(gasto.valor)}</button>)}
-                                  {ganhosDia.slice(0, 1).map((ganho) => <button type="button" key={ganho.id} onClick={() => abrirEdicaoLancamentoFinanceiro(ganho)} className="w-full text-left text-[10px] sm:text-xs rounded-lg px-1.5 py-1 bg-blue-50 text-blue-700">➕ {formatarMoeda(ganho.valor)}</button>)}
+                                  {gastosDia.slice(0, 1).map((gasto) => <button type="button" key={gasto.id} onClick={() => abrirEdicaoLancamentoFinanceiro(gasto)} className="w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 bg-slate-100 text-slate-700 truncate">📤 {formatarMoeda(gasto.valor)}</button>)}
+                                  {ganhosDia.slice(0, 1).map((ganho) => <button type="button" key={ganho.id} onClick={() => abrirEdicaoLancamentoFinanceiro(ganho)} className="w-full min-w-0 overflow-hidden text-left text-[8px] sm:text-xs rounded-md sm:rounded-lg px-1 py-0.5 sm:px-1.5 sm:py-1 bg-blue-50 text-blue-700 truncate">➕ {formatarMoeda(ganho.valor)}</button>)}
                                 </div>
                               </div>
                             );
@@ -3890,11 +3873,9 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                               <div className="mt-3 space-y-1">
                                 {parcelasDaDivida.slice(0, 12).map((parcela) => (
                                   <div key={parcela.id} className="flex items-center gap-2">
-                                    <button type="button" onClick={() => alternarDescontoParcelaFinanceira(parcela)} className={`flex-1 text-left text-xs px-3 py-2 rounded-lg border transition ${parcela.descontada ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
-                                      <div className="font-semibold">{parcela.descontada ? "☑ Descontada do mês" : "☐ Não descontada"}</div>
-                                      <div className="mt-0.5">{parcela.numero}/{divida.parcelas_total} — {formatarMoeda(parcela.valor)} — {formatarDataCurta(parcela.vencimento)}</div>
+                                    <button type="button" onClick={() => alternarParcelaFinanceira(parcela)} className={`flex-1 text-left text-xs px-2 py-1.5 rounded-lg ${parcela.paga ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-600"}`}>
+                                      {parcela.paga ? "☑" : "☐"} {parcela.numero}/{divida.parcelas_total} — {formatarMoeda(parcela.valor)} — {formatarDataCurta(parcela.vencimento)}
                                     </button>
-                                    <button type="button" onClick={() => alternarParcelaFinanceira(parcela)} className={`shrink-0 px-2 py-1.5 rounded-lg text-[11px] font-semibold ${parcela.paga ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`} title="Marcar parcela como paga">{parcela.paga ? "✓ Paga" : "Marcar paga"}</button>
                                     <button type="button" onClick={() => abrirEdicaoParcelaFinanceira(parcela)} className="w-8 h-8 rounded-lg hover:bg-slate-100" title="Editar valor da parcela">✏️</button>
                                   </div>
                                 ))}
@@ -3920,7 +3901,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                           <div className="p-8 text-center text-slate-500">Nenhum lançamento cadastrado neste mês.</div>
                         ) : lancamentosDoMes.slice(0, 30).map((item) => (
                           <div key={item.id} className="p-4 flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl">{categorias.find((categoria) => categoria.nome.trim().toLowerCase() === (item.categoria || "").trim().toLowerCase())?.emoji || (item.tipo === "salario" ? "💵" : item.tipo === "ganho_adicional" ? "➕" : "📤")}</div>
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl">{item.tipo === "salario" ? "💵" : item.tipo === "ganho_adicional" ? "➕" : "📤"}</div>
                             <div className="min-w-0 flex-1">
                               <p className="font-semibold text-slate-800 truncate">{item.descricao}</p>
                               <p className="text-xs text-slate-500">{formatarDataCurta(item.data)} {item.categoria ? `• ${item.categoria}` : ""}</p>
@@ -4033,7 +4014,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
               </div>
 
               <div className="w-full overflow-hidden">
-                <div className="w-full p-2 sm:p-5">
+                <div className="w-full p-1.5 sm:p-5">
                   <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-1 sm:mb-2">
                     {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((diaSemana) => (
                       <div
@@ -4053,7 +4034,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                       (_, index) => (
                         <div
                           key={`vazio-${index}`}
-                          className="min-w-0 min-h-[76px] sm:min-h-[112px] rounded-xl sm:rounded-2xl bg-slate-50/60 border border-transparent"
+                          className="min-w-0 min-h-[64px] sm:min-h-[112px] rounded-lg sm:rounded-2xl bg-slate-50/60 border border-transparent"
                         />
                       )
                     )}
@@ -4090,7 +4071,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                                 );
                               }
                             }}
-                            className={`min-w-0 min-h-[76px] sm:min-h-[112px] cursor-pointer text-left rounded-xl sm:rounded-2xl border p-1.5 sm:p-3 transition hover:shadow-sm hover:border-pink-200 ${
+                            className={`min-w-0 min-h-[64px] sm:min-h-[112px] cursor-pointer text-left rounded-lg sm:rounded-2xl border p-1 sm:p-3 overflow-hidden transition hover:shadow-sm hover:border-pink-200 ${
                               hojeCalendario
                                 ? "border-pink-300 bg-pink-50/40"
                                 : "border-slate-200 bg-white"
@@ -4098,7 +4079,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                           >
                             <div className="flex items-center justify-between gap-1 min-w-0">
                               <span
-                                className={`w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold ${
+                                className={`w-6 h-6 sm:w-8 sm:h-8 shrink-0 rounded-full flex items-center justify-center text-[10px] sm:text-sm font-bold ${
                                   hojeCalendario
                                     ? "bg-pink-500 text-white"
                                     : "text-slate-700"
@@ -4113,12 +4094,12 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                               )}
                             </div>
 
-                            <div className="space-y-1 mt-1.5 sm:mt-2 min-w-0">
+                            <div className="space-y-0.5 sm:space-y-1 mt-1 sm:mt-2 min-w-0">
                               {eventos.slice(0, 3).map((evento) => (
                                 <div
                                   key={evento.id}
                                   onClick={(e) => e.stopPropagation()}
-                                  className={`min-w-0 rounded-md sm:rounded-lg px-1 sm:px-2 py-1 sm:py-1.5 border ${
+                                  className={`min-w-0 overflow-hidden rounded-md sm:rounded-lg px-1 py-0.5 sm:px-2 sm:py-1.5 border ${
                                     evento.concluido
                                       ? "bg-slate-50 border-slate-200"
                                       : "bg-pink-50 border-pink-100"
@@ -4127,10 +4108,10 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                                   <button
                                     type="button"
                                     onClick={() => abrirEdicaoEvento(evento)}
-                                    className="w-full text-left"
+                                    className="w-full min-w-0 text-left overflow-hidden"
                                   >
                                     <p
-                                      className={`text-[9px] sm:text-xs leading-tight font-semibold break-words ${
+                                      className={`text-[8px] sm:text-xs leading-tight font-semibold truncate ${
                                         evento.concluido
                                           ? "line-through text-slate-400"
                                           : "text-slate-700"
@@ -4140,7 +4121,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                                       {emojiDoEvento(evento)} {evento.titulo}
                                     </p>
                                     {evento.horario && (
-                                      <p className="text-[8px] sm:text-[10px] text-slate-500 mt-0.5 truncate">
+                                      <p className="text-[7px] sm:text-[10px] text-slate-500 mt-0.5 truncate">
                                         {evento.horario}
                                       </p>
                                     )}
