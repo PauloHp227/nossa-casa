@@ -98,6 +98,7 @@ valor: number;
 vencimento: string;
 paga: boolean;
 data_pagamento: string | null;
+  descontada: boolean;
 };
 
 type Notificacao = {
@@ -1955,6 +1956,21 @@ async function alternarParcelaFinanceira(parcela: ParcelaFinanceira) {
   await buscarDados();
 }
 
+async function alternarDescontoParcelaFinanceira(parcela: ParcelaFinanceira) {
+  const novaDescontada = !parcela.descontada;
+  const { error } = await supabase
+    .from("financas_parcelas")
+    .update({ descontada: novaDescontada })
+    .eq("id", parcela.id);
+
+  if (error) {
+    setErro(error.message);
+    return;
+  }
+
+  await buscarDados();
+}
+
 async function salvarValorParcelaFinanceira(evento: FormEvent) {
   evento.preventDefault();
   if (!parcelaEditando || Number(valorParcelaEdicao) <= 0) return;
@@ -3800,7 +3816,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                 .filter((item) => item.tipo === "gasto" && item.data.startsWith(mesAtual))
                 .reduce((soma, item) => soma + Number(item.valor || 0), 0);
               const parcelasMes = parcelas
-                .filter((parcela) => parcela.vencimento.startsWith(mesAtual))
+                .filter((parcela) => parcela.descontada && parcela.vencimento.startsWith(mesAtual))
                 .reduce((soma, parcela) => soma + Number(parcela.valor || 0), 0);
               const disponivel = salariosMes + ganhosAdicionaisMes - gastosMes - parcelasMes;
               const parcelasPendentes = parcelas.filter((parcela) => !parcela.paga);
@@ -3907,7 +3923,10 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                                 {parcelasDaDivida.slice(0, 12).map((parcela) => (
                                   <div key={parcela.id} className="flex items-center gap-2">
                                     <button type="button" onClick={() => parcela.paga ? alternarParcelaFinanceira(parcela) : setParcelaFinanceiraParaQuitar(parcela)} className={`flex-1 text-left text-xs px-2 py-1.5 rounded-lg ${parcela.paga ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-600"}`}>
-                                      {parcela.paga ? "☑" : "☐"} {parcela.numero}/{divida.parcelas_total} — {formatarMoeda(parcela.valor)} — {formatarDataCurta(parcela.vencimento)}
+                                      {parcela.paga ? "☑ Quitada" : "☐ Quitar"} {parcela.numero}/{divida.parcelas_total} — {formatarMoeda(parcela.valor)} — {formatarDataCurta(parcela.vencimento)}
+                                    </button>
+                                    <button type="button" onClick={() => alternarDescontoParcelaFinanceira(parcela)} className={`text-[11px] px-2 py-1.5 rounded-lg whitespace-nowrap ${parcela.descontada ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`} title="Controla se a parcela será descontada do orçamento do mês">
+                                      {parcela.descontada ? "☑ Descontada" : "☐ Não descontada"}
                                     </button>
                                     <button type="button" onClick={() => abrirEdicaoParcelaFinanceira(parcela)} className="w-8 h-8 rounded-lg hover:bg-slate-100" title="Editar valor da parcela">✏️</button>
                                   </div>
