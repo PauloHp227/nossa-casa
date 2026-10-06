@@ -3800,7 +3800,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                 .filter((item) => item.tipo === "gasto" && item.data.startsWith(mesAtual))
                 .reduce((soma, item) => soma + Number(item.valor || 0), 0);
               const parcelasMes = parcelas
-                .filter((parcela) => !parcela.paga && parcela.vencimento.startsWith(mesAtual))
+                .filter((parcela) => parcela.vencimento.startsWith(mesAtual))
                 .reduce((soma, parcela) => soma + Number(parcela.valor || 0), 0);
               const disponivel = salariosMes + ganhosAdicionaisMes - gastosMes - parcelasMes;
               const parcelasPendentes = parcelas.filter((parcela) => !parcela.paga);
