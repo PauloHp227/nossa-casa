@@ -3877,7 +3877,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                     <section className="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl shadow-sm overflow-hidden">
                       <div className="p-5 border-b border-slate-100">
                         <h3 className="text-xl font-bold">💳 Dívidas</h3>
-                        <p className="text-sm text-slate-500 mt-1">{dividasVisiveis.filter((d) => d.status !== "quitada").length} em andamento • {dividasVisiveis.filter((d) => d.status === "quitada").length} quitada(s)</p>
+                        <p className="text-sm text-slate-500 mt-1">{dividasVisiveis.filter((d) => parcelas.filter((p) => p.divida_id === d.id).filter((p) => p.paga).length < d.parcelas_total).length} em andamento • {dividasVisiveis.filter((d) => parcelas.filter((p) => p.divida_id === d.id).filter((p) => p.paga).length >= d.parcelas_total).length} quitada(s)</p>
                       </div>
                       <div className="p-4 space-y-3 max-h-[520px] overflow-y-auto">
                         {dividasVisiveis.length === 0 ? (
@@ -3906,7 +3906,7 @@ return ( <main className="min-h-screen w-full max-w-full overflow-x-hidden bg-sl
                               <div className="mt-3 space-y-1">
                                 {parcelasDaDivida.slice(0, 12).map((parcela) => (
                                   <div key={parcela.id} className="flex items-center gap-2">
-                                    <button type="button" onClick={() => alternarParcelaFinanceira(parcela)} className={`flex-1 text-left text-xs px-2 py-1.5 rounded-lg ${parcela.paga ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-600"}`}>
+                                    <button type="button" onClick={() => parcela.paga ? alternarParcelaFinanceira(parcela) : setParcelaFinanceiraParaQuitar(parcela)} className={`flex-1 text-left text-xs px-2 py-1.5 rounded-lg ${parcela.paga ? "bg-emerald-50 text-emerald-700" : "bg-slate-50 text-slate-600"}`}>
                                       {parcela.paga ? "☑" : "☐"} {parcela.numero}/{divida.parcelas_total} — {formatarMoeda(parcela.valor)} — {formatarDataCurta(parcela.vencimento)}
                                     </button>
                                     <button type="button" onClick={() => abrirEdicaoParcelaFinanceira(parcela)} className="w-8 h-8 rounded-lg hover:bg-slate-100" title="Editar valor da parcela">✏️</button>
